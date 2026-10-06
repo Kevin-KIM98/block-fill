@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#12131c">
+<title>BLOCK FILL — 블록 퍼즐 랭킹전</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2312131c'/%3E%3Crect x='2' y='2' width='5' height='5' rx='1' fill='%23ffb020'/%3E%3Crect x='9' y='2' width='5' height='5' rx='1' fill='%234fd1ff'/%3E%3Crect x='2' y='9' width='5' height='5' rx='1' fill='%23ff5d6c'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>BLOCK<span>FILL</span></h1>
+    <nav>
+      <button id="btnMode" class="chip" title="모드 전환">일일 도전</button>
+      <button id="btnRank" class="chip">랭킹</button>
+      <button id="btnFriends" class="chip">친구</button>
+      <button id="btnMute" class="chip icon" aria-label="소리">♪</button>
+      <button id="btnUser" class="chip accent">로그인</button>
+    </nav>
+  </header>
+
+  <section class="stats">
+    <div class="stat"><small id="modeLabel">점수</small><b id="score">0</b></div>
+    <div class="stat"><small>최고 기록</small><b id="best">0</b></div>
+    <div class="stat points"><small>포인트</small><b id="points">0</b></div>
+  </section>
+
+  <div id="rival"></div>
+
+  <div id="boardWrap">
+    <div id="board"></div>
+    <div id="comboText"></div>
+  </div>
+
+  <div id="stuck" hidden>
+    <span>놓을 곳이 없습니다. 포인트로 리프레시해서 이어 가세요!</span>
+    <button id="btnGiveUp">포기</button>
+  </div>
+
+  <div id="tray"></div>
+
+  <section class="actions">
+    <button id="btnTray"><span>블럭 교체</span><b id="trayCost">50P</b></button>
+    <button id="btnBoard"><span>보드 리셋</span><b id="boardCost">200P</b></button>
+  </section>
+
+  <footer><span id="streak"></span><span id="version"></span></footer>
+</div>
+
+<div id="drag"></div>
+<div id="toast"></div>
+
+<dialog id="dlgAuth">
+  <form method="dialog" class="sheet" id="authForm">
+    <h2 id="authTitle">로그인</h2>
+    <p class="hint">로그인하면 점수가 서버에 저장되고 친구들과 순위를 겨룰 수 있습니다.</p>
+    <label>아이디<input id="authId" autocomplete="username" maxlength="16" placeholder="영문·숫자 3~16자" required></label>
+    <label id="nickRow" hidden>닉네임<input id="authNick" maxlength="12" placeholder="랭킹에 표시될 이름"></label>
+    <label>암호<input id="authPw" type="password" autocomplete="current-password" minlength="6" placeholder="6자 이상" required></label>
+    <p class="error" id="authError"></p>
+    <button class="primary" id="authSubmit" value="go">로그인</button>
+    <button type="button" class="link" id="authSwitch">계정이 없나요? 회원가입</button>
+    <button type="button" class="link" data-close>닫기</button>
+  </form>
+</dialog>
+
+<dialog id="dlgUser">
+  <div class="sheet">
+    <h2 id="userNick"></h2>
+    <p class="hint">내 친구 코드 <b class="code" id="userCode"></b></p>
+    <p class="hint" id="userStats"></p>
+    <button class="primary" id="btnLogout">로그아웃</button>
+    <button class="link" data-close>닫기</button>
+  </div>
+</dialog>
+
+<dialog id="dlgRank">
+  <div class="sheet">
+    <h2>랭킹</h2>
+    <div class="tabs" id="rankScope">
+      <button data-v="friends" class="on">친구</button><button data-v="global">전체</button>
+    </div>
+    <div class="tabs small" id="rankPeriod">
+      <button data-v="week" class="on">이번 주</button><button data-v="all">역대</button><button data-v="daily">오늘의 도전</button>
+    </div>
+    <ol id="rankList" class="list"></ol>
+    <button class="link" data-close>닫기</button>
+  </div>
+</dialog>
+
+<dialog id="dlgFriends">
+  <div class="sheet">
+    <h2>친구</h2>
+    <p class="hint">내 코드 <b class="code" id="myCode"></b> <button class="mini" id="btnCopyCode">복사</button></p>
+    <div class="row">
+      <input id="friendCode" maxlength="6" placeholder="친구 코드 6자리">
+      <button class="primary" id="btnAddFriend">추가</button>
+    </div>
+    <p class="error" id="friendError"></p>
+    <ul id="friendList" class="list"></ul>
+    <button class="link" data-close>닫기</button>
+  </div>
+</dialog>
+
+<dialog id="dlgOver">
+  <div class="sheet center">
+    <p class="badge" id="overBadge" hidden>최고 기록 갱신!</p>
+    <h2>게임 종료</h2>
+    <p class="big" id="overScore">0</p>
+    <p class="hint" id="overDetail"></p>
+    <p class="rankline" id="overRank"></p>
+    <button class="primary" id="btnAgain">다시 도전</button>
+    <button class="link" id="btnOverRank">랭킹 보기</button>
+    <button class="link" id="btnShare">결과 복사해서 자랑하기</button>
+  </div>
+</dialog>
+
+<script src="vendor/supabase.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
