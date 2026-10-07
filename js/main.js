@@ -6,6 +6,7 @@ import * as S from './storage.js';
 import * as O from './online.js';
 import { ACHIEVEMENTS, unlock, addHistory, rankOf } from './achievements.js';
 import * as M from './missions.js';
+import { createFX } from './fx.js';
 
 const $ = (id) => document.getElementById(id);
 const data = S.load();
@@ -34,6 +35,25 @@ function beep(freq, dur = 0.08, delay = 0, vol = 0.07) {
     o.start(t);
     o.stop(t + dur);
   } catch { /* 소리를 낼 수 없는 환경 */ }
+}
+
+// 폭발음: 잡음을 필터로 깎아 '쾅' 소리. power가 클수록 낮고 길다.
+function boom(power = 1, delay = 0) {
+  if (data.settings.mute) return;
+  try {
+    ac ??= new AudioContext();
+    const dur = 0.25 + power * 0.12;
+    const buf = ac.createBuffer(1, Math.ceil(ac.sampleRate * dur), ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 2;
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const f = ac.createBiquadFilter(); f.type = 'lowpass';
+    const t = ac.currentTime + delay;
+    f.frequency.setValueAtTime(1800 + power * 400, t); f.frequency.exponentialRampToValueAtTime(120, t + dur);
+    const g = ac.createGain(); g.gain.setValueAtTime(0.12 + power * 0.06, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(f).connect(g).connect(ac.destination);
+    src.start(t); src.stop(t + dur);
+  } catch { /* 무시 */ }
 }
 
 // ---------- 공통 ----------
@@ -230,6 +250,7 @@ function startGame(nextMode, forceNew = false) {
   newBestShown = state.score > best();
   persist();
   render([0, 1, 2]);
+  setFever(state.combo || 0);
   loadRivals();
 }
 
@@ -336,54 +357,76 @@ function showCombo(gain, note, big) {
   el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
 }
 
-// ---------- 줄 제거 이펙트 (파편·빛줄기) ----------
+// ---------- 이펙트 (캔버스 파티클, js/fx.js) ----------
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const colorOf = (n) => getComputedStyle(document.documentElement).getPropertyValue(`--c${n}`).trim() || '#fff';
+const fx = createFX($('fx'));
+const FX_PAD = 56; // 캔버스가 보드 밖으로 이만큼 삐져나온다 (조각이 밖으로 튀도록)
 
-function burst(cleared, colors, rows, cols) {
+function fxLayout() {
+  const w = $('boardWrap').getBoundingClientRect();
+  fx.resize(w.width + FX_PAD * 2, w.height + FX_PAD * 2);
+}
+// 칸 번호 → 캔버스 좌표(중심)
+function cellXY(i) {
+  const wr = $('boardWrap').getBoundingClientRect();
+  const r = cells[i].getBoundingClientRect();
+  return { x: r.left - wr.left + FX_PAD + r.width / 2, y: r.top - wr.top + FX_PAD + r.height / 2, u: r.width };
+}
+function boardBox() {
+  const wr = $('boardWrap').getBoundingClientRect(), b = $('board').getBoundingClientRect();
+  return { x: b.left - wr.left + FX_PAD, y: b.top - wr.top + FX_PAD, w: b.width, h: b.height };
+}
+addEventListener('resize', fxLayout);
+fxLayout();
+
+// 점수가 보드에서 점수판으로 날아간다
+function flyScore(text, from) {
   if (reduceMotion) return;
-  const fx = $('fx');
-  const u = cells[0].getBoundingClientRect().width;
-  const frag = document.createDocumentFragment();
-  // 지워진 줄을 따라 지나가는 빛줄기
-  for (const row of rows) {
-    const b = document.createElement('div');
-    b.className = 'beam';
-    Object.assign(b.style, { left: '0', width: `${u * N}px`, top: `${row * u + u * .2}px`, height: `${u * .6}px` });
-    frag.appendChild(b);
-  }
-  for (const col of cols) {
-    const b = document.createElement('div');
-    b.className = 'beam v';
-    Object.assign(b.style, { top: '0', height: `${u * N}px`, left: `${col * u + u * .2}px`, width: `${u * .6}px` });
-    frag.appendChild(b);
-  }
-  // 칸마다 색 파편이 사방으로 튄다
-  const per = cleared.length > 24 ? 3 : 5;
-  const sparks = [];
-  for (const i of cleared) {
-    const r = Math.floor(i / N), c = i % N;
-    const cx = c * u + u / 2, cy = r * u + u / 2;
-    for (let k = 0; k < per; k++) {
-      const d = document.createElement('div');
-      d.className = 'spark';
-      d.style.setProperty('--pc', colors[i]);
-      d.style.left = `${cx - 4}px`; d.style.top = `${cy - 4}px`;
-      const ang = Math.random() * Math.PI * 2;
-      const dist = u * (1 + Math.random() * 2.2);
-      sparks.push([d, Math.cos(ang) * dist, Math.sin(ang) * dist + u * .8, 360 * (Math.random() - .5), 450 + Math.random() * 400]);
-      frag.appendChild(d);
-    }
-  }
-  fx.appendChild(frag);
-  for (const [d, dx, dy, rot, ms] of sparks) {
-    d.animate([
-      { transform: 'translate(0,0) scale(1.3)', opacity: 1 },
-      { transform: `translate(${dx * .6}px, ${dy * .4}px) scale(1)`, opacity: 1, offset: .35 },
-      { transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(.2)`, opacity: 0 },
-    ], { duration: ms, easing: 'cubic-bezier(.2,.8,.4,1)', fill: 'forwards' }).onfinish = () => d.remove();
-  }
-  setTimeout(() => { for (const b of fx.querySelectorAll('.beam')) b.remove(); }, 500);
+  const el = document.createElement('div');
+  el.className = 'fly';
+  el.textContent = text;
+  $('flyLayer').appendChild(el);
+  const to = $('score').getBoundingClientRect();
+  el.style.left = `${from.x}px`; el.style.top = `${from.y}px`;
+  const dx = to.left + to.width / 2 - from.x, dy = to.top + to.height / 2 - from.y;
+  el.animate([
+    { transform: 'translate(-50%, -50%) scale(.6)', opacity: 0 },
+    { transform: 'translate(-50%, -50%) scale(1.3)', opacity: 1, offset: 0.2 },
+    { transform: 'translate(-50%, -50%) scale(1.1)', opacity: 1, offset: 0.45 },
+    { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.5)`, opacity: 0.9 },
+  ], { duration: 750, easing: 'cubic-bezier(.4,0,.6,1)', fill: 'forwards' }).onfinish = () => {
+    el.remove();
+    const sc = $('score');
+    sc.classList.remove('hot'); void sc.offsetWidth; sc.classList.add('hot');
+    setTimeout(() => sc.classList.remove('hot'), 500);
+  };
+}
+
+// 콤보 단계별 문구·효과 (1: 보통, 2: 더블/콤보, 3: 불타는 중, 4: 광란)
+function comboTier(ev) {
+  if (ev.lineCount >= 3 || ev.combo >= 6) return 4;
+  if (ev.lineCount >= 2 || ev.combo >= 4) return 3;
+  if (ev.combo >= 2) return 2;
+  return 1;
+}
+const COMBO_WORDS = { 2: ['COMBO!', 'NICE!', 'GOOD!'], 3: ['🔥 HOT!', '🔥 GREAT!', '🔥 AWESOME!'], 4: ['⚡ ON FIRE!', '💥 UNSTOPPABLE!', '🌈 LEGENDARY!'] };
+
+function setFever(combo) {
+  const lv = combo >= 6 ? 3 : combo >= 4 ? 2 : combo >= 2 ? 1 : 0;
+  const b = $('board');
+  b.classList.remove('fever1', 'fever2', 'fever3');
+  if (lv) b.classList.add(`fever${lv}`);
+  fx.setFever(lv, boardBox());
+}
+
+function shakeBoard(tier) {
+  const w = $('boardWrap');
+  w.classList.remove('shake', 'big', 'huge', 'hit'); void w.offsetWidth;
+  w.classList.add('shake');
+  if (tier >= 3) w.classList.add('big');
+  if (tier >= 4) w.classList.add('huge');
+  if (tier >= 2) w.classList.add('hit');
 }
 
 function doPlace(slot, r, c) {
@@ -392,31 +435,62 @@ function doPlace(slot, r, c) {
   if (!ev) return;
   persist();
   render([slot]);
-  flash(ev.placed.filter((i) => !ev.cleared.includes(i)), 'drop', 200);
+  const shapeColor = SHAPES[ev.shapeId].color;
+  const stay = ev.placed.filter((i) => !ev.cleared.includes(i));
+  flash(stay, 'drop', 200);
+  fx.land(stay.map(cellXY), colorOf(shapeColor));
 
   if (ev.lineCount > 0) {
-    const shapeColor = SHAPES[ev.shapeId].color;
+    const tier = comboTier(ev);
     const colors = {};
     for (const i of ev.cleared) {
       colors[i] = colorOf(before[i] || shapeColor);
       cells[i].style.setProperty('--pc', colors[i]);
     }
     flash(ev.cleared, 'pop', 500);
-    burst(ev.cleared, colors, ev.rows, ev.cols);
+    const u = cellXY(0).u;
+    const lines = [
+      ...ev.rows.map((row) => { const a = cellXY(row * N), b = cellXY(row * N + N - 1); return { x: a.x - u / 2, y: a.y - u * 0.3, w: b.x - a.x + u, h: u * 0.6 }; }),
+      ...ev.cols.map((col) => { const a = cellXY(col), b = cellXY((N - 1) * N + col); return { x: a.x - u * 0.3, y: a.y - u / 2, w: u * 0.6, h: b.y - a.y + u }; }),
+    ];
+    const pts = ev.cleared.map(cellXY);
+    const center = { x: pts.reduce((a, p) => a + p.x, 0) / pts.length, y: pts.reduce((a, p) => a + p.y, 0) / pts.length };
+    fx.explode({ cells: ev.cleared.map((i) => ({ ...cellXY(i), color: colors[i] })), lines, center, u, power: tier });
     const b = $('board');
     b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash');
 
     const notes = [];
-    if (ev.lineCount > 1) notes.push(['더블!', '트리플!', '쿼드러플!'][Math.min(ev.lineCount, 4) - 2] + ` ${ev.lineCount}줄`);
+    if (ev.lineCount > 1) notes.push(['더블', '트리플', '쿼드러플'][Math.min(ev.lineCount, 4) - 2] + ` ${ev.lineCount}줄`);
     if (ev.combo > 1) notes.push(`${ev.combo} 콤보`);
-    const big = ev.lineCount > 1 || ev.combo > 2;
-    showCombo(`+${fmt(ev.gain)}`, notes.join(' · '), big);
-    for (let i = 0; i < Math.min(ev.lineCount + ev.combo, 6); i++) beep(520 + i * 130, 0.12, i * 0.07);
-    const w = $('boardWrap');
-    w.classList.remove('shake', 'big'); void w.offsetWidth; w.classList.add('shake');
-    if (big) { w.classList.add('big'); navigator.vibrate?.([30, 30, 60]); }
+    const word = tier >= 2 ? COMBO_WORDS[tier][(ev.combo + ev.lineCount) % 3] + ' ' : '';
+    const el = $('comboText');
+    el.classList.remove('t2', 't3', 't4', 'huge');
+    if (tier >= 2) el.classList.add(`t${tier}`);
+    if (tier >= 4) el.classList.add('huge');
+    showCombo(`+${fmt(ev.gain)}`, word + notes.join(' · '), tier >= 3);
+    const wr = $('boardWrap').getBoundingClientRect();
+    flyScore(`+${fmt(ev.gain)}`, { x: wr.left + center.x - FX_PAD, y: wr.top + center.y - FX_PAD });
+
+    boom(tier);
+    for (let i = 0; i < Math.min(ev.lineCount + ev.combo, 8); i++) beep(520 + i * 110 + tier * 60, 0.12, 0.05 + i * 0.06);
+    shakeBoard(tier);
+    if (tier >= 3) navigator.vibrate?.(tier >= 4 ? [40, 30, 80, 30, 120] : [30, 30, 60]);
+    setFever(ev.combo);
+
+    // 보드를 완전히 비웠다: 퍼펙트
+    if (state.board.every((v) => !v)) {
+      setTimeout(() => {
+        el.classList.remove('t2', 't3'); el.classList.add('t4', 'huge');
+        showCombo('PERFECT!', '보드를 전부 비웠습니다', true);
+        fx.perfect(center, u);
+        boom(3); [659, 784, 988, 1319, 1568].forEach((f, i) => beep(f, 0.2, i * 0.09, 0.09));
+        shakeBoard(4);
+        navigator.vibrate?.([60, 40, 120]);
+      }, 650);
+    }
   } else {
     beep(260, 0.05);
+    setFever(0);
   }
 
   if (ev.levelUp) {
@@ -425,11 +499,15 @@ function doPlace(slot, r, c) {
     flash(ev.stones, 'drop', 400);
     setTimeout(() => {
       const mult = G.scoreMult(ev.levelUp);
+      const el = $('comboText');
+      el.classList.remove('t2', 't3', 't4', 'huge'); el.classList.add('t2');
       showCombo(`LEVEL ${ev.levelUp}`, (ev.stones.length ? `기본 블럭 +${ev.stones.length} · ` : '') + `점수 ×${mult.toFixed(1)}`, true);
-      [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.14, i * 0.09));
+      const c = cellXY(Math.floor(N * N / 2) + N / 2);
+      fx.levelUp({ x: c.x - c.u / 2, y: c.y - c.u / 2 }, c.u);
+      boom(2); [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.14, i * 0.09));
       navigator.vibrate?.(60);
       toast(`레벨 ${ev.levelUp}! 큰 블럭이 늘고 기본 블럭이 떨어집니다`, 2000);
-    }, ev.lineCount > 0 ? 800 : 0);
+    }, ev.lineCount > 0 ? 900 : 0);
   }
 
   if (mode === 'classic' && !newBestShown && best() > 0 && state.score > best()) {

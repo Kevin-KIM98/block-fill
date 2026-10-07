@@ -42,7 +42,9 @@ const ui = (page) => page.evaluate(() => ({
 }));
 
 // 놓을 수 있는 자리 하나를 고른다 (줄이 지워지는 자리를 우선). 화면 좌표까지 계산해 돌려준다.
+// 줄이 지워진 직후에는 보드가 흔들려 칸 위치가 움직이므로, 흔들림이 끝난 뒤 좌표를 잰다.
 async function pickTarget(page, touch) {
+  await page.waitForTimeout((await page.evaluate(() => document.getElementById('boardWrap').classList.contains('shake') && globalThis.__blockfill.state.combo > 0)) ? 700 : 0);
   return page.evaluate(async (touch) => {
     const G = await import('./js/game.js');
     const { SHAPES } = await import('./js/shapes.js');
