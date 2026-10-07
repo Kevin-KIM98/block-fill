@@ -111,20 +111,39 @@ export function createFX(canvas) {
   }
 
   // 폭탄 폭발: 폭탄 자리에서 큰 충격파 + 가로·세로 레이저 + 불기둥 + 칸 연쇄 폭발. wave가 클수록(연쇄) 더 크다
-  function bombBlast(at, u, lines, cells, wave = 0) {
+  function bombBlast(at, u, lines, cells, wave = 0, hidden = false) {
     if (reduce) return;
-    const p = 2 + Math.min(2, wave);
-    flash(wave ? COOL[2] : HOT[1], 0.22 + wave * 0.06, 0.3);
-    ring(at.x, at.y, '#fff', 2, u * 2.2, 0.4, 8);
-    ring(at.x, at.y, HOT[1], u * 0.5, u * 10, 0.8, 12, 0.05);
+    const p = 2 + Math.min(3, wave);
+    const main = ['#ffb020', '#ff5d6c', '#c36bff', '#4fd1ff'][Math.min(3, wave)];
+    const sub = ['#ffd23f', '#ff6a3d', '#ff6fb5', '#ffffff'][Math.min(3, wave)];
+    if (hidden) { // 숨은 폭탄 공개: 하얀 섬광 + 빠른 링
+      flash('#fff', 0.5, 0.25);
+      ring(at.x, at.y, '#fff', 2, u * 3, 0.3, 10);
+      for (let k = 0; k < n(30); k++) spark(at.x, at.y, '#fff', 1.4, 1.6, 0, 200);
+    }
+    flash(main, 0.25 + wave * 0.07, 0.35);
+    // 충격파 3겹
+    ring(at.x, at.y, '#fff', 2, u * 2.5, 0.4, 9);
+    ring(at.x, at.y, main, u * 0.5, u * (9 + wave * 2), 0.8, 12 + wave * 3, 0.06);
+    ring(at.x, at.y, sub, u * 0.3, u * 6, 0.6, 6, 0.14);
+    // 십자 레이저(굵게) + 레이저가 지나간 자리를 따라 불길이 번진다
     for (const l of lines) {
       const a = l.horiz ? 0 : Math.PI / 2;
-      laser(at.x, at.y, a, l.len, wave ? COOL[2] : HOT[2], 0, 14);
-      laser(at.x, at.y, a + Math.PI, l.len, wave ? COOL[2] : HOT[2], 0, 14);
+      for (const dir of [a, a + Math.PI]) {
+        laser(at.x, at.y, dir, l.len, main, 0, 16 + wave * 4);
+        laser(at.x, at.y, dir, l.len, '#fff', 0.08, 6);
+        for (let s = u * 0.5; s < l.len; s += u * 0.45) {
+          const fx0 = at.x + Math.cos(dir) * s, fy0 = at.y + Math.sin(dir) * s;
+          const d = s / u * 0.03;
+          flame(fx0 + rnd(-6, 6), fy0 + rnd(-6, 6), 1.2 + wave * 0.2, d);
+          if (Math.random() < 0.6) spark(fx0, fy0, Math.random() < 0.5 ? '#fff' : sub, 0.7, 1, d, 350);
+        }
+      }
     }
-    for (let k = 0; k < 12; k++) ray(at.x, at.y, k % 2 ? HOT[1] : '#fff', (k / 12) * TAU, u * 4);
-    for (let k = 0; k < n(40 + p * 15); k++) spark(at.x, at.y, k % 3 ? HOT[k % HOT.length] : '#fff', 1.2 + p * 0.2, 1.5, 0, 280);
-    for (let k = 0; k < n(24); k++) flame(at.x + rnd(-u, u), at.y + rnd(-u * 0.5, u * 0.5), 1.4, rnd(0, 0.15));
+    // 빛살(회전 오프셋) + 중심 빛점 + 불기둥
+    for (let k = 0; k < 16; k++) ray(at.x, at.y, k % 2 ? main : '#fff', (k / 16) * TAU + wave * 0.2, u * (4 + wave), k * 0.01);
+    for (let k = 0; k < n(50 + p * 20); k++) spark(at.x, at.y, k % 3 ? [main, sub][k % 2] : '#fff', 1.3 + p * 0.2, 1.5, 0, 280);
+    for (let k = 0; k < n(30 + wave * 10); k++) flame(at.x + rnd(-u, u), at.y + rnd(-u * 0.5, u * 0.5), 1.5 + wave * 0.2, rnd(0, 0.15));
     for (const c of cells) {
       const d = Math.hypot(c.x - at.x, c.y - at.y) / u * 0.035;
       for (let k = 0; k < n(2); k++) shard(c.x, c.y, c.color, 1, d);
@@ -132,7 +151,9 @@ export function createFX(canvas) {
       for (let k = 0; k < n(3); k++) flame(c.x + rnd(-u * 0.3, u * 0.3), c.y, 1, d);
       ring(c.x, c.y, c.color, 2, u * 0.9, 0.3, 3, d);
     }
-    if (wave >= 1) for (let k = 0; k < 2; k++) rocket(at.x + rnd(-u, u), at.y, pick(COOL), 1.2, 0.2 + k * 0.15);
+    // 파동이 거듭될수록 폭죽이 늘고, 3차부터는 레이저 방사까지
+    for (let k = 0; k < 1 + wave; k++) rocket(at.x + rnd(-u * 2, u * 2), at.y, k % 2 ? main : sub, 1.2 + wave * 0.15, 0.15 + k * 0.12);
+    if (wave >= 2) for (let k = 0; k < 12; k++) laser(at.x, at.y, (k / 12) * TAU + 0.26, u * 6, k % 2 ? sub : '#fff', 0.12 + k * 0.015, 5);
   }
 
   // 블럭이 보드에 닿을 때: 작은 충격파 + 먼지

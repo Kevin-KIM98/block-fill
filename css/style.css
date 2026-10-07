@@ -157,6 +157,24 @@ nav { display: flex; gap: 6px; flex-wrap: wrap; }
 .pc.bomb::after, .cell.bomb::after { content: ""; position: absolute; inset: 24%; border-radius: 50%; z-index: 1;
   background: radial-gradient(circle at 35% 32%, #8a8fa8, #1a1c26 55%, #000 100%); box-shadow: 0 0 0 1.5px rgba(255,255,255,.35), 0 0 10px 2px #ffb020; animation: fuse .7s infinite alternate; }
 .cell.bomb::after { inset: 22%; }
+/* 숨겨진 폭탄: 기본 블럭 위에 희미한 반짝임만 (눈썰미 좋은 사람은 찾는다) */
+.cell.hid::after { content: ""; position: absolute; left: 34%; top: 28%; width: 32%; height: 3px; border-radius: 2px; transform: rotate(-35deg);
+  background: rgba(255, 210, 90, .55); animation: glint 2.6s infinite; z-index: 1; }
+@keyframes glint { 0%, 70%, 100% { opacity: .12; } 80% { opacity: .8; box-shadow: 0 0 6px #ffd23f; } }
+/* 점화 예고: 곧 터질 폭탄 칸이 하얗게 맥동하다가 터진다 */
+.cell.ignite::after { animation: ignite .12s infinite alternate, pop .45s both; animation-delay: 0s, var(--d, 0s); }
+@keyframes ignite { from { filter: brightness(1.2); transform: scale(1); } to { filter: brightness(2.6); transform: scale(1.25); } }
+#board.punch { animation: punch .28s; }
+@keyframes punch { 30% { transform: scale(1.05); } }
+/* 화면 전체 섬광 (연쇄 파동마다) */
+#blastLayer { position: fixed; inset: 0; pointer-events: none; z-index: 45; opacity: 0; background: radial-gradient(circle at var(--bx, 50%) var(--by, 50%), var(--bc, #fff) 0%, transparent 60%); }
+#blastLayer.go { animation: blast .45s ease-out; }
+@keyframes blast { 0% { opacity: 0; } 12% { opacity: .75; } 100% { opacity: 0; } }
+#chainText { position: absolute; left: 0; right: 0; top: 8%; text-align: center; pointer-events: none; z-index: 7; opacity: 0;
+  font-size: 34px; font-weight: 900; letter-spacing: 2px; color: #fff;
+  text-shadow: 0 0 10px #c36bff, 0 0 30px #c36bff, 0 3px 0 rgba(0,0,0,.6); }
+#chainText.show { animation: chainIn .9s forwards; }
+@keyframes chainIn { 0% { opacity: 0; transform: scale(2) rotate(-6deg); } 20% { opacity: 1; transform: scale(1) rotate(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-20px); } }
 @keyframes fuse { from { box-shadow: 0 0 0 1.5px rgba(255,255,255,.35), 0 0 6px 1px #ffb020; } to { box-shadow: 0 0 0 1.5px rgba(255,255,255,.6), 0 0 16px 4px #ff5d6c; } }
 
 .slot .piece { --u: calc(var(--cell) * .5); }

@@ -20,6 +20,7 @@ const shapeByName = (n) => SHAPES.find((s) => s.name === n).id;
 const empty = (extra = {}) => {
   const s = G.newGame({ seed: 1 });
   s.board.fill(0);
+  s.bombs = []; s.hidden = []; s.trayBombs = [null, null, null]; // 빈 판에는 폭탄도 없다
   return Object.assign(s, extra);
 };
 
@@ -256,6 +257,25 @@ test('십자에 걸린 폭탄은 연쇄로 터지고, 안 걸린 폭탄은 남�
 });
 
 
+test('숨겨진 폭탄: 시작 기본 블럭에 숨어 있다가 그 줄이 지워지면 십자로 터진다', () => {
+  const g = G.newGame({ seed: 3 });
+  assert.equal(g.hidden.length, CFG.bomb.hiddenInPrefill);
+  for (const h of g.hidden) assert.equal(g.board[h], G.STONE);
+  const s = empty({ hidden: [3] }); // (0,3) 기본 블럭 속에 폭탄
+  for (let c = 1; c < N; c++) s.board[c] = c === 3 ? G.STONE : 1;
+  for (let r = 1; r < N - 1; r++) s.board[r * N + 3] = 2; // 3열 1~6행 채움 (완성 줄 아님)
+  s.tray[0] = shapeByName('dot_0');
+  const ev = G.place(s, 0, 0, 0);
+  assert.deepEqual(ev.revealed, [3]);
+  assert.deepEqual(ev.bombs, [3]);
+  assert.equal(ev.waves[1].hidden, true);
+  assert.equal(ev.lineCount, 3);
+  for (let r = 0; r < N; r++) assert.equal(s.board[r * N + 3], 0);
+  assert.deepEqual(s.hidden, []);
+  // 같은 시드는 숨은 폭탄 자리도 같다 (일일 도전)
+  assert.deepEqual(G.newGame({ seed: 3 }).hidden, g.hidden);
+});
+
 test('폭탄 필드가 없는 옛 판도 그대로 이어지고, 무작위 판에서 폭탄은 항상 채워진 칸 위에만 있다', () => {
   const s = empty();
   delete s.trayBombs; delete s.bombs; delete s.bombGauge; delete s.bombCharges;
@@ -272,6 +292,7 @@ test('폭탄 필드가 없는 옛 판도 그대로 이어지고, 무작위 판�
         if (G.canPlace(g, g.tray[slot], Math.floor(i / N), i % N)) { G.place(g, slot, Math.floor(i / N), i % N); done = true; }
       }
       for (const b of g.bombs) assert.ok(g.board[b], '폭탄이 빈 칸 위에 있음');
+      for (const b of g.hidden) assert.equal(g.board[b], G.STONE, '숨은 폭탄은 기본 블럭 위에만');
       assert.equal(new Set(g.bombs).size, g.bombs.length);
       g.trayBombs.forEach((b, k) => { if (b != null) assert.ok(b >= 0 && b < SHAPES[g.tray[k]].cells.length); });
     }

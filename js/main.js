@@ -122,10 +122,11 @@ function pieceEl(shapeId, bombCell = null) {
 }
 
 function render(freshSlots = []) {
-  const bombSet = new Set(state.bombs || []);
+  const bombSet = new Set(state.bombs || []), hidSet = new Set(state.hidden || []);
   state.board.forEach((v, i) => {
     if (v) cells[i].dataset.c = v; else delete cells[i].dataset.c;
     cells[i].classList.toggle('bomb', bombSet.has(i));
+    cells[i].classList.toggle('hid', hidSet.has(i) && !!v);
   });
   slots.forEach((slot, i) => {
     const id = state.tray[i];
@@ -419,6 +420,25 @@ function flyScore(text, from) {
   };
 }
 
+// 연쇄 파동용 화면 전체 섬광과 CHAIN 문구
+const CHAIN_COLORS = ['#ffb020', '#ff5d6c', '#c36bff', '#4fd1ff', '#ffffff'];
+function screenBlast(at, chainNo) {
+  if (reduceMotion) return;
+  const wr = $('boardWrap').getBoundingClientRect();
+  const el = $('blastLayer');
+  el.style.setProperty('--bx', `${((wr.left + at.x - FX_PAD) / innerWidth * 100).toFixed(1)}%`);
+  el.style.setProperty('--by', `${((wr.top + at.y - FX_PAD) / innerHeight * 100).toFixed(1)}%`);
+  el.style.setProperty('--bc', CHAIN_COLORS[Math.min(CHAIN_COLORS.length - 1, chainNo)]);
+  el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+}
+function chainText(chainNo, hidden) {
+  const el = $('chainText');
+  el.textContent = hidden ? `💣 숨은 폭탄! CHAIN ×${chainNo}` : chainNo >= 3 ? `💥 MEGA CHAIN ×${chainNo}` : `💥 CHAIN ×${chainNo}`;
+  el.style.fontSize = `${Math.min(52, 30 + chainNo * 5)}px`;
+  el.style.textShadow = `0 0 10px ${CHAIN_COLORS[Math.min(4, chainNo)]}, 0 0 30px ${CHAIN_COLORS[Math.min(4, chainNo)]}, 0 3px 0 rgba(0,0,0,.6)`;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+}
+
 // 콤보 단계별 문구·효과 (1: 보통, 2: 더블/콤보, 3: 불타는 중, 4: 광란)
 function comboTier(ev) {
   if (ev.lineCount >= 3 || ev.combo >= 6) return 4;
@@ -483,20 +503,31 @@ function doPlace(slot, r, c) {
       }
     });
     flash(ev.cleared, 'pop', 500 + maxDelay * 1000);
-    // 폭탄 파동: 폭탄 자리에서 십자 레이저와 큰 폭발
+    // 폭탄 파동: 점화 예고 → 화면 섬광 → 십자 레이저·불길 → CHAIN 문구. 파동이 거듭될수록 커진다
+    const chainWaves = ev.waves.filter((w) => w.bomb != null);
     ev.waves.forEach((w, wi) => {
       if (w.bomb == null) return;
       const b = cellXY(w.bomb);
+      const chainNo = chainWaves.indexOf(w) + 1;
+      // 폭탄 칸은 자기 파동 시각까지 남아 하얗게 맥동한다 (점화 예고)
+      cells[w.bomb].style.setProperty('--d', `${(wi * WAVE).toFixed(3)}s`);
+      cells[w.bomb].classList.add('ignite');
+      setTimeout(() => cells[w.bomb].classList.remove('ignite'), wi * WAVE * 1000 + 600);
       const bl = [
         { cx: cellXY(w.rows[0] * N + N / 2).x, cy: b.y, horiz: true, len: u * N },
         { cx: b.x, cy: cellXY(Math.floor(N / 2) * N + w.cols[0]).y, horiz: false, len: u * N },
       ];
       setTimeout(() => {
-        fx.bombBlast({ x: b.x, y: b.y }, u, bl, w.cells.map((i) => ({ ...cellXY(i), color: colors[i] })), wi);
-        boom(3, 0); buzz(BUZZ.clear3);
-        shakeBoard(3 + (wi >= 2 ? 1 : 0));
+        fx.bombBlast({ x: b.x, y: b.y }, u, bl, w.cells.map((i) => ({ ...cellXY(i), color: colors[i] })), chainNo - 1, w.hidden);
+        screenBlast(b, chainNo);
+        chainText(chainNo, w.hidden);
+        boom(3 + Math.min(2, chainNo), 0); [660, 880, 1100, 1320][Math.min(3, chainNo)] && beep([660, 880, 1100, 1320][Math.min(3, chainNo)], 0.2, 0, 0.09);
+        buzz(chainNo >= 2 ? BUZZ.clear4 : BUZZ.clear3);
+        shakeBoard(Math.min(4, 2 + chainNo));
+        const bd = $('board'); bd.classList.remove('punch'); void bd.offsetWidth; bd.classList.add('punch');
       }, wi * WAVE * 1000);
     });
+    if (ev.revealed.length) setTimeout(() => toast('💣 기본 블럭 속에 숨어 있던 폭탄이 터졌습니다!', 2000), 300);
     const lines = [
       ...ev.rows.map((row) => { const a = cellXY(row * N), b = cellXY(row * N + N - 1); return { cx: (a.x + b.x) / 2, cy: a.y, horiz: true, len: b.x - a.x + u }; }),
       ...ev.cols.map((col) => { const a = cellXY(col), b = cellXY((N - 1) * N + col); return { cx: a.x, cy: (a.y + b.y) / 2, horiz: false, len: b.y - a.y + u }; }),
