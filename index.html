@@ -42,13 +42,12 @@
   </div>
 
   <div id="stuck" hidden>
-    <span>놓을 곳이 없습니다. 아래 버튼으로 블럭을 바꾸거나 보드를 리셋하세요!</span>
+    <span>놓을 곳이 없습니다. 포인트로 블럭을 교체해 이어 가세요!</span>
     <button id="btnGiveUp">포기</button>
   </div>
 
   <section class="actions">
-    <button id="btnTray"><span>블럭 교체</span><b id="trayCost">50P</b></button>
-    <button id="btnBoard"><span>보드 리셋</span><b id="boardCost">200P</b></button>
+    <button id="btnTray"><span>🔄 블럭 3개 교체</span><b id="trayCost">50P</b></button>
   </section>
 
   <div id="tray"></div>
@@ -116,7 +115,7 @@
   <div class="sheet">
     <h2>내 기록</h2>
     <div class="tabs" id="recTabs">
-      <button data-v="history" class="on">기록</button><button data-v="achievements">업적</button>
+      <button data-v="missions">오늘의 미션</button><button data-v="history" class="on">기록</button><button data-v="achievements">업적</button>
     </div>
     <p class="hint" id="recSummary"></p>
     <ol id="recList" class="list"></ol>
@@ -131,9 +130,10 @@
     <ol class="howto">
       <li><b>끌어다 놓기</b><span>아래 블럭 3개 중 하나를 눌러 보드로 끌어다 놓으세요. 놓으면 그 자리에 새 블럭이 생깁니다.</span></li>
       <li><b>줄 지우기</b><span>가로나 세로 한 줄이 꽉 차면 지워지고 칸 수만큼 포인트를 얻습니다. 여러 줄을 한 번에, 연속으로 지우면 배수가 붙습니다.</span></li>
-      <li><b>막히면 리프레시</b><span>놓을 곳이 없으면 포인트로 <b>블럭 교체</b>나 <b>보드 리셋</b>을 사세요. 쓸수록 비싸집니다.</span></li>
+      <li><b>막히면 블럭 교체</b><span>놓을 곳이 없으면 포인트로 <b>블럭 3개 교체</b>를 사세요. 쓸수록 비싸지니 아껴 쓰세요.</span></li>
       <li><b>레벨이 오르면 더 어렵게</b><span>줄 6개를 지울 때마다 레벨이 오릅니다. 레벨이 오르면 보드에 기본 블럭이 떨어지고 큰 블럭이 자주 나오지만, 줄 클리어 점수 배수도 커집니다.</span></li>
-      <li><b>기록과 경쟁</b><span>"최고 기록" 카드를 누르면 내 기록과 업적이 보입니다. 일일 도전은 모두 같은 판으로 하루 한 번 겨룹니다.</span></li>
+      <li><b>오늘의 미션</b><span>매일 목표 3개가 주어집니다. 하나 달성할 때마다 그날 일반 모드 시작 포인트가 +20P 늘어납니다.</span></li>
+      <li><b>기록과 경쟁</b><span>"최고 기록" 카드를 누르면 내 기록·미션·업적이 보입니다. 일일 도전은 모두 같은 판으로 하루 한 번 겨룹니다.</span></li>
     </ol>
     <button class="primary" data-close>시작하기</button>
   </div>
@@ -147,8 +147,9 @@
     <p class="hint" id="overDetail"></p>
     <p class="rankline" id="overRank"></p>
     <p class="hint" id="overOwn"></p>
+    <p class="hint" id="overMission"></p>
     <button class="primary" id="btnAgain">다시 도전</button>
-    <button class="link" id="btnOverRecords">내 기록·업적 보기</button>
+    <button class="link" id="btnOverRecords">내 기록·미션·업적 보기</button>
     <button class="link" id="btnOverRank">랭킹 보기</button>
     <button class="primary alt" id="btnShareImg">📸 결과 이미지 공유</button>
     <button class="link" id="btnShare">글로 복사해서 자랑하기</button>

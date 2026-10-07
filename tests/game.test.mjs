@@ -5,6 +5,7 @@ import { SHAPES } from '../js/shapes.js';
 import * as G from '../js/game.js';
 import { migrate, SCHEMA } from '../js/storage.js';
 import { ACHIEVEMENTS, unlock, addHistory, rankOf, HISTORY_MAX } from '../js/achievements.js';
+import * as M from '../js/missions.js';
 import { readFileSync } from 'node:fs';
 
 let passed = 0;
@@ -201,32 +202,22 @@ test('레벨업 순간 기본 블럭이 떨어지되 줄을 완성시키지 않�
 
 test('리프레시 비용은 쓸 때마다 오른다', () => {
   const s = empty({ points: 100000 });
-  const tray = [], board = [];
+  const tray = [];
   for (let i = 0; i < 4; i++) { tray.push(G.trayCost(s)); assert.ok(G.refreshTray(s)); }
-  for (let i = 0; i < 4; i++) { board.push(G.boardCost(s)); assert.ok(G.refreshBoard(s)); }
   assert.deepEqual(tray, [50, 80, 128, 205]);
-  assert.deepEqual(board, [200, 400, 800, 1600]);
-  assert.equal(s.points, 100000 - 463 - 3000);
+  assert.equal(s.points, 100000 - 463);
+  assert.equal(G.refreshBoard, undefined); // 보드 리셋은 v1.9에서 제거됨
 });
 
 test('포인트가 모자라면 리프레시되지 않는다', () => {
   const s = empty({ points: 49 });
   const tray = s.tray.slice();
   assert.equal(G.refreshTray(s), false);
-  assert.equal(G.refreshBoard(s), false);
   assert.deepEqual(s.tray, tray);
   assert.equal(s.points, 49);
   assert.equal(s.trayRefreshes, 0);
 });
 
-test('보드 리프레시는 기본 블럭 판으로 되돌린다', () => {
-  const s = empty({ points: 200 });
-  s.board.fill(1, 0, 40);
-  assert.ok(G.refreshBoard(s));
-  assert.equal(s.board.filter(Boolean).length, CFG.prefill);
-  assert.equal(s.points, 0);
-  assert.ok(G.anyMove(s));
-});
 
 // 체스판 무늬로 채우면 1칸 블럭 말고는 들어갈 곳이 없다.
 function checker(s) {
@@ -275,7 +266,7 @@ test('무작위 1000판: 규칙이 깨지지 않는다', () => {
     let guard = 0;
     while (!s.over && guard++ < 5000) {
       if (s.stuck) {
-        const ok = G.refreshTray(s) || G.refreshBoard(s);
+        const ok = G.refreshTray(s);
         assert.ok(ok, 'stuck 상태면 리프레시를 살 수 있어야 한다');
         continue;
       }
@@ -355,6 +346,39 @@ test('level 필드가 없는 옛 판도 그대로 이어진다', () => {
   assert.equal(s.level, 3);
   assert.equal(ev.levelUp, 0); // 이미 레벨 3이었던 것으로 본다
   assert.equal(ev.gain, Math.round(N * CFG.pointsPerCell * G.scoreMult(3)));
+});
+
+test('오늘의 미션: 날짜마다 같은 3개가 나오고, 진행·달성·날짜 초기화가 맞다', () => {
+  const a = M.missionsFor('2026-10-07'), b = M.missionsFor('2026-10-07'), c = M.missionsFor('2026-10-08');
+  assert.deepEqual(a, b);
+  assert.equal(a.length, 3);
+  assert.equal(new Set(a.map((x) => x.id)).size, 3);
+  assert.ok(a.every((x) => x.text && x.target > 0));
+  assert.notDeepEqual(a.map((x) => x.id + x.target), c.map((x) => x.id + x.target));
+  // 진행: 줄 미션을 직접 구성해 검사
+  const missions = [{ id: 'lines', kind: 'sum', target: 3, text: '' }, { id: 'score', kind: 'max', target: 100, text: '' }, { id: 'games', kind: 'sum', target: 1, text: '' }];
+  let m = M.ensureDay(null, '2026-10-07');
+  const st = { score: 50, level: 1 };
+  assert.deepEqual(M.onPlace(m, missions, { lineCount: 2, combo: 1, cleared: new Array(16) }, st, 'classic'), []);
+  assert.equal(m.progress.lines, 2);
+  assert.equal(m.progress.score, 50);
+  st.score = 120;
+  const got = M.onPlace(m, missions, { lineCount: 1, combo: 1, cleared: [] }, st, 'classic');
+  assert.deepEqual(got.map((x) => x.id).sort(), ['lines', 'score']);
+  assert.equal(M.doneCount(m), 2);
+  assert.equal(M.bonusPoints(m), 2 * CFG.missionBonus);
+  // 이미 달성한 미션은 다시 알리지 않는다
+  assert.deepEqual(M.onPlace(m, missions, { lineCount: 5, combo: 1, cleared: [] }, st, 'classic'), []);
+  assert.deepEqual(M.onFinish(m, missions, st, 'classic').map((x) => x.id), ['games']);
+  // 일일 도전 점수는 '한 판 점수' 미션에 안 들어간다
+  const m2 = M.ensureDay(null, '2026-10-07');
+  M.onPlace(m2, missions, { lineCount: 0, combo: 0, cleared: [] }, { score: 999, level: 9 }, 'daily');
+  assert.equal(m2.progress.score, undefined);
+  // 날짜가 바뀌면 초기화
+  const m3 = M.ensureDay(m, '2026-10-08');
+  assert.equal(M.doneCount(m3), 0);
+  assert.equal(m3.date, '2026-10-08');
+  assert.equal(migrate({ schema: 3, local: {} }).missions.date, null);
 });
 
 test('진행 중인 판은 JSON으로 저장했다가 그대로 이어진다', () => {

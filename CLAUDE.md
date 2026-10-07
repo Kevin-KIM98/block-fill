@@ -8,6 +8,7 @@
 - `js/shapes.js` — 블럭 모양
 - `js/game.js` — 규칙. DOM을 쓰지 않는 순수 로직 (난수는 `state.rng`만 사용)
 - `js/achievements.js` — 업적 정의·판정, 개인 기록 목록. DOM 없음
+- `js/missions.js` — 오늘의 미션(날짜 시드로 3개) 정의·진행. DOM 없음
 - `js/storage.js` — 기기 저장과 이전(`migrate`)
 - `js/online.js` — Supabase 로그인·랭킹·친구
 - `js/main.js` — 그리기, 드래그, 대화창

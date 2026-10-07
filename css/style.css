@@ -141,8 +141,8 @@ nav { display: flex; gap: 6px; flex-wrap: wrap; }
 @keyframes fresh { from { transform: scale(.3); opacity: 0; } }
 #drag { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 20; --u: var(--cell); display: none; opacity: .92; }
 
-.actions { width: calc(var(--cell) * 8 + 8px); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.actions button { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 9px 8px;
+.actions { width: calc(var(--cell) * 8 + 8px); display: grid; grid-template-columns: 1fr; gap: 8px; }
+.actions button { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px;
   display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
 .actions button b { color: var(--accent); }
 .actions button:disabled { opacity: .4; }
@@ -191,6 +191,11 @@ dialog::backdrop { background: rgba(5,6,12,.75); }
 .list li.locked { opacity: .45; }
 .list li .ic { width: 26px; text-align: center; font-size: 18px; }
 .list li.new { background: rgba(255,176,32,.14); border-radius: 8px; }
+.list li .prog { position: absolute; left: 6px; right: 6px; bottom: 0; height: 3px; background: var(--line); border-radius: 2px; }
+.list li .prog i { display: block; height: 100%; background: var(--accent2); border-radius: 2px; }
+.list li.mission { position: relative; padding-bottom: 12px; }
+.list li.mission.done .prog i { background: var(--accent); }
+.list li .pct { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .big { margin: 0; font-size: 46px; font-weight: 900; color: var(--accent); font-variant-numeric: tabular-nums; }
 .badge { margin: 0 auto; background: var(--danger); border-radius: 999px; padding: 4px 14px; font-size: 13px; font-weight: 800; animation: bump .6s infinite; }
 .rankline { margin: 0; min-height: 1.3em; color: var(--accent2); font-weight: 700; font-size: 15px; }

@@ -1,7 +1,7 @@
 // 기기 저장소. 버전 번호를 두고 구조가 바뀌면 단계별로 이전한다.
 // 규칙: 저장 키를 바꾸거나 통째로 지우지 않는다. 새 필드는 migrate()에서 채운다.
 const KEY = 'blockfill.save';
-export const SCHEMA = 3;
+export const SCHEMA = 4;
 
 const defaults = () => ({
   schema: SCHEMA,
@@ -12,6 +12,7 @@ const defaults = () => ({
   current: { classic: null, daily: null }, // 진행 중인 판
   dailyDone: {},                            // { 'YYYY-MM-DD': 점수 }
   pending: [],                              // 전송하지 못한 점수
+  missions: { date: null, progress: {}, done: {} }, // 오늘의 미션 진행 (날짜가 바뀌면 초기화)
 });
 
 // 예) schema 1 → 2로 올릴 때:
@@ -33,6 +34,10 @@ export function migrate(data) {
   if (data.schema < 3) { // v1.6: 첫 실행 안내
     data.settings.helpShown ??= false;
     data.schema = 3;
+  }
+  if (data.schema < 4) { // v1.9: 오늘의 미션
+    data.missions ??= { date: null, progress: {}, done: {} };
+    data.schema = 4;
   }
   data.schema = SCHEMA;
   return data;

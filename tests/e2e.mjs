@@ -33,14 +33,12 @@ const ui = (page) => page.evaluate(() => ({
   best: Number(document.getElementById('best').textContent.replace(/\D/g, '')),
   tray: [...document.querySelectorAll('#tray .slot')].map((s) => s.dataset.shape),
   trayCost: document.getElementById('trayCost').textContent,
-  boardCost: document.getElementById('boardCost').textContent,
   trayDisabled: document.getElementById('btnTray').disabled,
-  boardDisabled: document.getElementById('btnBoard').disabled,
   stuck: !document.getElementById('stuck').hidden,
   over: document.getElementById('dlgOver').open,
   version: document.getElementById('version').textContent,
-  st: (({ moves, lines, score, points, over, stuck, trayRefreshes, boardRefreshes, mode }) =>
-    ({ moves, lines, score, points, over, stuck, trayRefreshes, boardRefreshes, mode }))(globalThis.__blockfill.state),
+  st: (({ moves, lines, score, points, over, stuck, trayRefreshes, mode }) =>
+    ({ moves, lines, score, points, over, stuck, trayRefreshes, mode }))(globalThis.__blockfill.state),
 }));
 
 // 놓을 수 있는 자리 하나를 고른다 (줄이 지워지는 자리를 우선). 화면 좌표까지 계산해 돌려준다.
@@ -107,7 +105,7 @@ console.log('\n[1] 한 판 끝까지 플레이 (마우스 드래그)');
     const u0 = await ui(page);
     if (u0.over) break;
     if (u0.st.over) { // 포인트까지 바닥 → 종료 화면은 0.5초 뒤에 열린다
-      check('놓을 곳도 포인트도 없으면 자동으로 끝난다', u0.trayDisabled && u0.boardDisabled);
+      check('놓을 곳도 포인트도 없으면 자동으로 끝난다', u0.trayDisabled);
       await page.waitForSelector('#dlgOver[open]', { timeout: 3000 });
       break;
     }
@@ -122,11 +120,7 @@ console.log('\n[1] 한 판 끝까지 플레이 (마우스 드래그)');
         check(`블럭 교체: 포인트가 비용만큼 줄고 블럭이 바뀐다 (${u0.points}→${u1.points})`, u1.points === u0.points - costs.at(-1) && u1.tray.join() !== u0.tray.join());
         continue;
       }
-      if (!u0.boardDisabled) {
-        await page.click('#btnBoard'); refreshes++;
-        continue;
-      }
-      check('포인트 부족: 두 리프레시 버튼이 모두 비활성', u0.trayDisabled && u0.boardDisabled);
+      check('포인트 부족: 블럭 교체 버튼이 비활성', u0.trayDisabled);
       await page.click('#btnGiveUp');
       await page.waitForTimeout(700);
       break;
@@ -157,6 +151,9 @@ console.log('\n[1] 한 판 끝까지 플레이 (마우스 드래그)');
   await page.waitForTimeout(200);
   const rec = await page.evaluate(() => ({ open: document.getElementById('dlgRecords').open, rows: document.querySelectorAll('#recList li').length, summary: document.getElementById('recSummary').textContent }));
   check('종료 화면에서 내 기록이 열리고 이번 판이 있다', rec.open && rec.rows >= 3 && /1판/.test(rec.summary), rec.summary);
+  await page.click('#recTabs button[data-v="missions"]');
+  const mis = await page.evaluate(() => ({ rows: document.querySelectorAll('#recList li.mission').length, done: document.querySelectorAll('#recList li.mission.done').length, summary: document.getElementById('recSummary').textContent }));
+  check('오늘의 미션 3개가 보이고 진행이 표시된다', mis.rows === 3, mis.summary);
   await page.click('#recTabs button[data-v="achievements"]');
   const ach = await page.evaluate(() => document.querySelectorAll('#recList li:not(.locked)').length);
   check('업적이 하나 이상 달성됐다 (첫 줄 등)', ach >= 1, `${ach}개`);

@@ -5,6 +5,7 @@ import * as G from './game.js';
 import * as S from './storage.js';
 import * as O from './online.js';
 import { ACHIEVEMENTS, unlock, addHistory, rankOf } from './achievements.js';
+import * as M from './missions.js';
 
 const $ = (id) => document.getElementById(id);
 const data = S.load();
@@ -120,18 +121,16 @@ function render(freshSlots = []) {
   $('btnMode').textContent = mode === 'daily' ? '일반 모드' : '일일 도전';
   $('btnMode').classList.toggle('on', mode === 'daily');
 
-  const tc = G.trayCost(state), bc = G.boardCost(state);
+  const tc = G.trayCost(state);
   setText('trayCost', `${fmt(tc)}P`);
-  setText('boardCost', `${fmt(bc)}P`);
   $('btnTray').disabled = state.over || state.points < tc;
-  $('btnBoard').disabled = state.over || state.points < bc;
   $('btnTray').classList.toggle('urge', state.stuck);
-  $('btnBoard').classList.toggle('urge', state.stuck);
   $('stuck').hidden = !state.stuck;
 
   const streak = data.local.streak;
   const bonus = Math.min(streak, CFG.streakBonusMaxDays) * CFG.streakBonusPerDay;
-  $('streak').textContent = streak > 0 ? `연속 출석 ${streak}일 · 시작 보너스 +${bonus}P` : '';
+  const mdone = M.doneCount(todayMissions());
+  $('streak').textContent = (streak > 0 ? `연속 출석 ${streak}일 · 보너스 +${bonus}P` : '') + (mdone ? ` · 미션 ${mdone}/3 +${mdone * CFG.missionBonus}P` : '');
   updateRival();
 }
 
@@ -225,7 +224,7 @@ function startGame(nextMode, forceNew = false) {
     state = G.newGame({ mode, seed: G.seedFromString(`daily-${today}`), dailyDate: today, startPoints: CFG.startPoints });
   } else {
     const streak = S.touchStreak();
-    const startPoints = CFG.startPoints + Math.min(streak, CFG.streakBonusMaxDays) * CFG.streakBonusPerDay;
+    const startPoints = CFG.startPoints + Math.min(streak, CFG.streakBonusMaxDays) * CFG.streakBonusPerDay + M.bonusPoints(todayMissions());
     state = G.newGame({ mode, startPoints });
   }
   newBestShown = state.score > best();
@@ -292,6 +291,23 @@ function endDrag() {
 
 // ---------- 진행 ----------
 let newBestShown = false;
+
+// 오늘의 미션 (날짜가 바뀌면 자동 초기화)
+function todayMissions() {
+  const today = S.todayKST();
+  if (data.missions?.date !== today) { data.missions = M.ensureDay(data.missions, today); S.save(); }
+  return data.missions;
+}
+function missionList() { return M.missionsFor(S.todayKST()); }
+function announceMissions(got) {
+  if (!got.length) return;
+  S.save();
+  got.forEach((mi, i) => setTimeout(() => {
+    toast(`🎯 미션 달성: ${mi.text} (+${CFG.missionBonus}P 시작 보너스)`, 2600);
+    [784, 988, 1319].forEach((f, k) => beep(f, 0.12, k * 0.08));
+    render();
+  }, 1200 + i * 2700));
+}
 
 function checkAchievements(ev) {
   const local = { ...data.local, dailyDone: data.dailyDone };
@@ -421,13 +437,13 @@ function doPlace(slot, r, c) {
     toast('최고 기록 돌파! 어디까지 갈 수 있을까요?');
   }
   checkAchievements(ev);
+  announceMissions(M.onPlace(todayMissions(), missionList(), ev, state, mode));
   if (state.over) setTimeout(finish, 500);
   else if (state.stuck) beep(180, 0.3);
 }
 
-function useRefresh(kind) {
-  const ok = kind === 'tray' ? G.refreshTray(state) : G.refreshBoard(state);
-  if (!ok) return;
+function useRefresh() {
+  if (!G.refreshTray(state)) return;
   beep(660, 0.08); beep(990, 0.12, 0.08);
   persist();
   render([0, 1, 2]);
@@ -446,11 +462,14 @@ async function finish() {
   const ownRank = mode === 'classic' ? rankOf(data.local.history, state.score) : 0;
   addHistory(data.local.history, {
     score: state.score, date: S.todayKST(), mode, lines: state.lines, combo: state.bestCombo, level: state.level ?? 1,
-    moves: state.moves, refresh: state.trayRefreshes + state.boardRefreshes,
+    moves: state.moves, refresh: state.trayRefreshes,
   });
   data.current[mode] = null;
   S.save();
   checkAchievements(null);
+  announceMissions(M.onFinish(todayMissions(), missionList(), state, mode));
+  const md = M.doneCount(todayMissions());
+  $('overMission').textContent = `오늘의 미션 ${md}/3` + (md < 3 ? ' · 달성하면 내일까지 시작 포인트가 늘어납니다' : ' · 모두 달성! 🎉');
 
   const games = data.local.history.filter((h) => h.mode === 'classic').length;
   $('overOwn').textContent = mode === 'classic' && games > 1
@@ -459,7 +478,7 @@ async function finish() {
 
   $('overBadge').hidden = !isRecord;
   $('overScore').textContent = fmt(state.score);
-  $('overDetail').textContent = `레벨 ${state.level ?? 1} · 지운 줄 ${state.lines} · 최대 콤보 ${state.bestCombo} · 리프레시 ${state.trayRefreshes + state.boardRefreshes}회`;
+  $('overDetail').textContent = `레벨 ${state.level ?? 1} · 지운 줄 ${state.lines} · 최대 콤보 ${state.bestCombo} · 블럭 교체 ${state.trayRefreshes}회`;
   $('btnAgain').textContent = mode === 'daily' ? '일반 모드 하러 가기' : '다시 도전';
   $('overRank').textContent = '';
   $('dlgOver').showModal();
@@ -638,6 +657,26 @@ const dateShort = (d) => (d || '').slice(5).replace('-', '/');
 
 function loadRecords() {
   const list = $('recList');
+  if (recTab === 'missions') {
+    const m = todayMissions();
+    const list = $('recList');
+    $('recSummary').textContent = `${S.todayKST()} · ${M.doneCount(m)}/3 달성 · 시작 보너스 +${M.bonusPoints(m)}P (매일 자정에 새 미션)`;
+    list.replaceChildren(...missionList().map((mi) => {
+      const li = document.createElement('li');
+      const done = !!m.done[mi.id];
+      const cur = Math.min(mi.target, m.progress[mi.id] || 0);
+      li.className = 'mission' + (done ? ' done' : '');
+      const ic = Object.assign(document.createElement('span'), { className: 'ic', textContent: done ? '✅' : '🎯' });
+      const nm = Object.assign(document.createElement('span'), { className: 'nm', textContent: mi.text });
+      const pc = Object.assign(document.createElement('span'), { className: 'pct', textContent: done ? `+${CFG.missionBonus}P` : `${fmt(cur)} / ${fmt(mi.target)}` });
+      const bar = document.createElement('span'); bar.className = 'prog';
+      const fill = document.createElement('i'); fill.style.width = `${Math.round(100 * cur / mi.target)}%`;
+      bar.appendChild(fill);
+      li.append(ic, nm, pc, bar);
+      return li;
+    }));
+    return;
+  }
   if (recTab === 'history') {
     const hist = data.local.history;
     const classic = hist.filter((h) => h.mode === 'classic');
@@ -653,7 +692,7 @@ function loadRecords() {
       const nm = Object.assign(document.createElement('span'), { className: 'nm' });
       nm.textContent = h.mode === 'daily' ? `오늘의 도전 ${dateShort(h.date)}` : dateShort(h.date);
       const sm = document.createElement('small');
-      sm.textContent = `${h.level ? `Lv.${h.level} · ` : ''}줄 ${h.lines} · 콤보 ${h.combo} · 리프레시 ${h.refresh}회`;
+      sm.textContent = `${h.level ? `Lv.${h.level} · ` : ''}줄 ${h.lines} · 콤보 ${h.combo} · 교체 ${h.refresh}회`;
       nm.appendChild(sm);
       const sc = Object.assign(document.createElement('span'), { className: 'sc', textContent: fmt(h.score) });
       li.append(r, nm, sc);
@@ -780,7 +819,7 @@ function resultImage() {
     if (v) { g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.roundRect(x + 3, y + u - 13, u - 6, 10, 6); g.fill(); }
   });
   g.fillStyle = '#8b90a8'; g.font = '600 22px system-ui, sans-serif';
-  g.fillText(`레벨 ${state.level ?? 1} · 지운 줄 ${state.lines} · 최대 콤보 ${state.bestCombo} · 리프레시 ${state.trayRefreshes + state.boardRefreshes}회`, W / 2, oy + u * N + 50);
+  g.fillText(`레벨 ${state.level ?? 1} · 지운 줄 ${state.lines} · 최대 콤보 ${state.bestCombo} · 블럭 교체 ${state.trayRefreshes}회`, W / 2, oy + u * N + 50);
   g.fillStyle = '#eef0f8'; g.font = '800 26px system-ui, sans-serif';
   g.fillText('내 기록 깰 수 있어?', W / 2, oy + u * N + 95);
   g.fillStyle = css('--accent2'); g.font = '600 20px system-ui, sans-serif';
@@ -821,8 +860,7 @@ function openHelp() {
 $('btnHelp').addEventListener('click', () => { $('dlgRecords').close(); openHelp(); });
 
 // ---------- 버튼 ----------
-$('btnTray').addEventListener('click', () => useRefresh('tray'));
-$('btnBoard').addEventListener('click', () => useRefresh('board'));
+$('btnTray').addEventListener('click', useRefresh);
 $('btnGiveUp').addEventListener('click', () => { G.giveUp(state); render(); finish(); });
 $('btnMode').addEventListener('click', () => startGame(mode === 'daily' ? 'classic' : 'daily'));
 $('btnMute').addEventListener('click', () => { data.settings.mute = !data.settings.mute; S.save(); refreshUser(); });

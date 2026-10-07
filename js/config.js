@@ -1,6 +1,6 @@
 // 게임 설정값. 밸런스 조정은 이 파일에서만 한다.
 // 배포할 때 version.json의 값도 같이 올린다 (앱이 새 버전을 알아채는 기준).
-export const APP_VERSION = '1.8.0';
+export const APP_VERSION = '1.9.0';
 
 export const CFG = {
   size: 8,                 // 보드 한 변의 칸 수
@@ -13,10 +13,9 @@ export const CFG = {
   comboMaxMult: 3,
   trayCostBase: 50,        // 하단 블럭 리프레시 시작 비용
   trayCostGrowth: 1.6,     // 사용할 때마다 곱해지는 값
-  boardCostBase: 200,      // 메인 보드 리프레시 시작 비용
-  boardCostGrowth: 2,
   streakBonusPerDay: 10,   // 연속 출석 1일당 시작 포인트
   streakBonusMaxDays: 7,
+  missionBonus: 20,        // 오늘의 미션 1개 달성당 그날 일반 모드 시작 포인트 보너스
   // 레벨(난이도 곡선): 줄을 지울수록 오른다. 레벨이 오르면 기본 블럭이 떨어지고 큰 블럭이 늘고 점수 배수가 붙는다.
   level: {
     linesPerLevel: 6,      // 이만큼 줄을 지울 때마다 레벨 +1

@@ -101,7 +101,7 @@ export function newGame({ mode = 'classic', seed, startPoints = 0, dailyDate = n
     tray: [0, 0, 0],
     level: 1,
     score: 0, points: startPoints, combo: 0, bestCombo: 0,
-    trayRefreshes: 0, boardRefreshes: 0,
+    trayRefreshes: 0,
     moves: 0, lines: 0, stuck: false, over: false,
   };
   state.tray = state.tray.map(() => randomShape(rng));
@@ -142,11 +142,10 @@ export function linesIfPlaced(state, shapeId, r, c) {
 }
 
 export const trayCost = (state) => Math.round(CFG.trayCostBase * CFG.trayCostGrowth ** state.trayRefreshes);
-export const boardCost = (state) => Math.round(CFG.boardCostBase * CFG.boardCostGrowth ** state.boardRefreshes);
 
 function updateStatus(state) {
   if (anyMove(state)) { state.stuck = false; return; }
-  const canPay = state.points >= trayCost(state) || state.points >= boardCost(state);
+  const canPay = state.points >= trayCost(state);
   state.stuck = canPay;
   state.over = !canPay;
 }
@@ -208,18 +207,6 @@ export function refreshTray(state) {
   state.points -= cost;
   state.trayRefreshes += 1;
   state.tray = state.tray.map(() => randomShape(state.rng, state.level ?? 1));
-  ensureMove(state);
-  updateStatus(state);
-  return true;
-}
-
-export function refreshBoard(state) {
-  const cost = boardCost(state);
-  if (state.over || state.points < cost) return false;
-  state.points -= cost;
-  state.boardRefreshes += 1;
-  state.board = makeBoard(state.rng);
-  state.combo = 0;
   ensureMove(state);
   updateStatus(state);
   return true;
