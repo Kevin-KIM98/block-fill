@@ -112,6 +112,11 @@ function render(freshSlots = []) {
   setText('best', fmt(Math.max(best(), mode === 'classic' ? state.score : 0)));
   setText('points', fmt(state.points), true);
   setText('modeLabel', mode === 'daily' ? '오늘의 도전' : '점수');
+  const lv = state.level ?? G.levelOf(state);
+  setText('level', `Lv.${lv}`);
+  const toNext = G.linesToNextLevel(state);
+  $('levelBar').style.width = toNext ? `${100 * (1 - toNext / CFG.level.linesPerLevel)}%` : '100%';
+  $('level').title = toNext ? `다음 레벨까지 ${toNext}줄` : '최고 레벨';
   $('btnMode').textContent = mode === 'daily' ? '일반 모드' : '일일 도전';
   $('btnMode').classList.toggle('on', mode === 'daily');
 
@@ -398,6 +403,19 @@ function doPlace(slot, r, c) {
     beep(260, 0.05);
   }
 
+  if (ev.levelUp) {
+    const lvEl = $('level');
+    lvEl.classList.remove('up'); void lvEl.offsetWidth; lvEl.classList.add('up');
+    flash(ev.stones, 'drop', 400);
+    setTimeout(() => {
+      const mult = G.scoreMult(ev.levelUp);
+      showCombo(`LEVEL ${ev.levelUp}`, (ev.stones.length ? `기본 블럭 +${ev.stones.length} · ` : '') + `점수 ×${mult.toFixed(1)}`, true);
+      [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.14, i * 0.09));
+      navigator.vibrate?.(60);
+      toast(`레벨 ${ev.levelUp}! 큰 블럭이 늘고 기본 블럭이 떨어집니다`, 2000);
+    }, ev.lineCount > 0 ? 800 : 0);
+  }
+
   if (mode === 'classic' && !newBestShown && best() > 0 && state.score > best()) {
     newBestShown = true;
     toast('최고 기록 돌파! 어디까지 갈 수 있을까요?');
@@ -427,7 +445,7 @@ async function finish() {
   data.local.games += 1;
   const ownRank = mode === 'classic' ? rankOf(data.local.history, state.score) : 0;
   addHistory(data.local.history, {
-    score: state.score, date: S.todayKST(), mode, lines: state.lines, combo: state.bestCombo,
+    score: state.score, date: S.todayKST(), mode, lines: state.lines, combo: state.bestCombo, level: state.level ?? 1,
     moves: state.moves, refresh: state.trayRefreshes + state.boardRefreshes,
   });
   data.current[mode] = null;
@@ -441,7 +459,7 @@ async function finish() {
 
   $('overBadge').hidden = !isRecord;
   $('overScore').textContent = fmt(state.score);
-  $('overDetail').textContent = `지운 줄 ${state.lines} · 최대 콤보 ${state.bestCombo} · 리프레시 ${state.trayRefreshes + state.boardRefreshes}회`;
+  $('overDetail').textContent = `레벨 ${state.level ?? 1} · 지운 줄 ${state.lines} · 최대 콤보 ${state.bestCombo} · 리프레시 ${state.trayRefreshes + state.boardRefreshes}회`;
   $('btnAgain').textContent = mode === 'daily' ? '일반 모드 하러 가기' : '다시 도전';
   $('overRank').textContent = '';
   $('dlgOver').showModal();
@@ -635,7 +653,7 @@ function loadRecords() {
       const nm = Object.assign(document.createElement('span'), { className: 'nm' });
       nm.textContent = h.mode === 'daily' ? `오늘의 도전 ${dateShort(h.date)}` : dateShort(h.date);
       const sm = document.createElement('small');
-      sm.textContent = `줄 ${h.lines} · 콤보 ${h.combo} · 리프레시 ${h.refresh}회`;
+      sm.textContent = `${h.level ? `Lv.${h.level} · ` : ''}줄 ${h.lines} · 콤보 ${h.combo} · 리프레시 ${h.refresh}회`;
       nm.appendChild(sm);
       const sc = Object.assign(document.createElement('span'), { className: 'sc', textContent: fmt(h.score) });
       li.append(r, nm, sc);
@@ -762,7 +780,7 @@ function resultImage() {
     if (v) { g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.roundRect(x + 3, y + u - 13, u - 6, 10, 6); g.fill(); }
   });
   g.fillStyle = '#8b90a8'; g.font = '600 22px system-ui, sans-serif';
-  g.fillText(`지운 줄 ${state.lines} · 최대 콤보 ${state.bestCombo} · 리프레시 ${state.trayRefreshes + state.boardRefreshes}회`, W / 2, oy + u * N + 50);
+  g.fillText(`레벨 ${state.level ?? 1} · 지운 줄 ${state.lines} · 최대 콤보 ${state.bestCombo} · 리프레시 ${state.trayRefreshes + state.boardRefreshes}회`, W / 2, oy + u * N + 50);
   g.fillStyle = '#eef0f8'; g.font = '800 26px system-ui, sans-serif';
   g.fillText('내 기록 깰 수 있어?', W / 2, oy + u * N + 95);
   g.fillStyle = css('--accent2'); g.font = '600 20px system-ui, sans-serif';

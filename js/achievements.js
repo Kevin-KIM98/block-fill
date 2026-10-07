@@ -10,6 +10,8 @@ export const ACHIEVEMENTS = [
   { id: 'score300', title: '300점', desc: '한 판에 300점을 넘겼다', check: ({ state }) => state.score >= 300 },
   { id: 'score1000', title: '1,000점', desc: '한 판에 1,000점을 넘겼다', check: ({ state }) => state.score >= 1000 },
   { id: 'score3000', title: '3,000점', desc: '한 판에 3,000점을 넘겼다', check: ({ state }) => state.score >= 3000 },
+  { id: 'level5', title: '레벨 5', desc: '한 판에 레벨 5에 올랐다', check: ({ state }) => (state.level ?? 1) >= 5 },
+  { id: 'level10', title: '레벨 10', desc: '한 판에 레벨 10에 올랐다', check: ({ state }) => (state.level ?? 1) >= 10 },
   { id: 'lines20', title: '정리왕', desc: '한 판에 줄 20개를 지웠다', check: ({ state }) => state.lines >= 20 },
   { id: 'pure500', title: '순수 실력', desc: '리프레시 없이 500점을 넘겼다',
     check: ({ state }) => state.score >= 500 && state.trayRefreshes + state.boardRefreshes === 0 },

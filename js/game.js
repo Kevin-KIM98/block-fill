@@ -20,10 +20,48 @@ export function seedFromString(str) {
   return h >>> 0;
 }
 
-function randomShape(rng) {
-  let x = rand(rng) * TOTAL_WEIGHT;
-  for (const s of SHAPES) { x -= s.weight; if (x < 0) return s.id; }
+// 레벨: 지운 줄 수로 정해진다 (1부터).
+export const levelOf = (state) => Math.min(CFG.level.max, 1 + Math.floor(state.lines / CFG.level.linesPerLevel));
+export const linesToNextLevel = (state) =>
+  levelOf(state) >= CFG.level.max ? 0 : CFG.level.linesPerLevel - (state.lines % CFG.level.linesPerLevel);
+export const scoreMult = (level) => 1 + CFG.level.scoreBonus * (level - 1);
+
+// 레벨이 오를수록 작은 블럭은 줄고 큰 블럭은 는다.
+export function shapeWeight(shape, level) {
+  const k = level - 1, n = shape.cells.length;
+  if (n <= 3) return shape.weight * Math.max(CFG.level.smallFloor, 1 - CFG.level.smallDecay * k);
+  if (n >= 5) return shape.weight * (1 + CFG.level.bigGrowth * k);
+  return shape.weight;
+}
+
+function randomShape(rng, level = 1) {
+  if (level <= 1) {
+    let x = rand(rng) * TOTAL_WEIGHT;
+    for (const s of SHAPES) { x -= s.weight; if (x < 0) return s.id; }
+    return SHAPES[SHAPES.length - 1].id;
+  }
+  const ws = SHAPES.map((s) => shapeWeight(s, level));
+  let x = rand(rng) * ws.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < SHAPES.length; i++) { x -= ws[i]; if (x < 0) return SHAPES[i].id; }
   return SHAPES[SHAPES.length - 1].id;
+}
+
+// 빈 칸에 기본 블럭을 떨어뜨린다. 줄을 완성시키는 자리는 피한다. 떨어진 칸 번호를 돌려준다.
+function dropStones(state, count) {
+  const empties = [];
+  state.board.forEach((v, i) => { if (!v) empties.push(i); });
+  for (let i = empties.length - 1; i > 0; i--) { // 셔플 (난수는 state.rng만)
+    const j = Math.floor(rand(state.rng) * (i + 1));
+    [empties[i], empties[j]] = [empties[j], empties[i]];
+  }
+  const dropped = [];
+  for (const i of empties) {
+    if (dropped.length >= count) break;
+    state.board[i] = STONE;
+    if (hasFullLine(state.board)) { state.board[i] = 0; continue; }
+    dropped.push(i);
+  }
+  return dropped;
 }
 
 const idx = (r, c) => r * CFG.size + c;
@@ -61,6 +99,7 @@ export function newGame({ mode = 'classic', seed, startPoints = 0, dailyDate = n
     v: STATE_VERSION, mode, dailyDate, rng,
     board: makeBoard(rng),
     tray: [0, 0, 0],
+    level: 1,
     score: 0, points: startPoints, combo: 0, bestCombo: 0,
     trayRefreshes: 0, boardRefreshes: 0,
     moves: 0, lines: 0, stuck: false, over: false,
@@ -115,7 +154,7 @@ function updateStatus(state) {
 // 새 판을 시작하거나 유료 리프레시 직후에는 최소 한 수가 있도록 보장한다.
 function ensureMove(state) {
   for (let i = 0; i < 50 && !anyMove(state); i++) {
-    state.tray = state.tray.map(() => randomShape(state.rng));
+    state.tray = state.tray.map(() => randomShape(state.rng, state.level ?? 1));
   }
 }
 
@@ -133,13 +172,14 @@ export function place(state, slot, r, c) {
   for (const i of cleared) state.board[i] = 0;
 
   const lineCount = rows.length + cols.length;
+  const level = state.level ?? levelOf(state); // 옛 저장 판에는 level이 없다
   let gain = 0;
   if (lineCount > 0) {
     state.combo += 1;
     state.bestCombo = Math.max(state.bestCombo, state.combo);
     const lineMult = CFG.lineMult[Math.min(lineCount, CFG.lineMult.length - 1)];
     const comboMult = Math.min(CFG.comboMaxMult, 1 + CFG.comboStep * (state.combo - 1));
-    gain = Math.round(cleared.size * CFG.pointsPerCell * lineMult * comboMult);
+    gain = Math.round(cleared.size * CFG.pointsPerCell * lineMult * comboMult * scoreMult(level));
     state.lines += lineCount;
   } else {
     state.combo = 0;
@@ -148,10 +188,18 @@ export function place(state, slot, r, c) {
   state.score += placed.length + gain;
   state.points += Math.round(gain * (CFG.pointsRate ?? 1)); // 포인트는 점수보다 천천히 쌓인다
   state.moves += 1;
-  state.tray[slot] = randomShape(state.rng); // 놓은 자리에 즉시 새 블럭
+
+  // 레벨업: 기본 블럭이 떨어진다
+  let levelUp = 0, stones = [];
+  state.level = levelOf(state);
+  if (state.level > level) {
+    levelUp = state.level;
+    stones = dropStones(state, Math.min(CFG.level.maxStones, (state.level - 1) * CFG.level.stonesPerLevel));
+  }
+  state.tray[slot] = randomShape(state.rng, state.level); // 놓은 자리에 즉시 새 블럭
   updateStatus(state);
 
-  return { shapeId, placed, cleared: [...cleared], rows, cols, lineCount, gain, combo: state.combo };
+  return { shapeId, placed, cleared: [...cleared], rows, cols, lineCount, gain, combo: state.combo, level: state.level, levelUp, stones };
 }
 
 export function refreshTray(state) {
@@ -159,7 +207,7 @@ export function refreshTray(state) {
   if (state.over || state.points < cost) return false;
   state.points -= cost;
   state.trayRefreshes += 1;
-  state.tray = state.tray.map(() => randomShape(state.rng));
+  state.tray = state.tray.map(() => randomShape(state.rng, state.level ?? 1));
   ensureMove(state);
   updateStatus(state);
   return true;

@@ -1,6 +1,6 @@
 // 게임 설정값. 밸런스 조정은 이 파일에서만 한다.
 // 배포할 때 version.json의 값도 같이 올린다 (앱이 새 버전을 알아채는 기준).
-export const APP_VERSION = '1.7.0';
+export const APP_VERSION = '1.8.0';
 
 export const CFG = {
   size: 8,                 // 보드 한 변의 칸 수
@@ -17,6 +17,17 @@ export const CFG = {
   boardCostGrowth: 2,
   streakBonusPerDay: 10,   // 연속 출석 1일당 시작 포인트
   streakBonusMaxDays: 7,
+  // 레벨(난이도 곡선): 줄을 지울수록 오른다. 레벨이 오르면 기본 블럭이 떨어지고 큰 블럭이 늘고 점수 배수가 붙는다.
+  level: {
+    linesPerLevel: 6,      // 이만큼 줄을 지울 때마다 레벨 +1
+    max: 12,
+    stonesPerLevel: 1,     // 레벨업 때 떨어지는 기본 블럭 = min(maxStones, (레벨-1) × 이 값)
+    maxStones: 6,
+    smallDecay: 0.1,       // 레벨 1당 작은 블럭(1~3칸) 비중 감소율
+    smallFloor: 0.25,      // 작은 블럭 비중 하한
+    bigGrowth: 0.12,       // 레벨 1당 큰 블럭(5칸 이상) 비중 증가율
+    scoreBonus: 0.1,       // 레벨 1당 줄 클리어 점수 배수 +10%
+  },
 };
 
 // 온라인(로그인·랭킹) 설정. Supabase 프로젝트를 만든 뒤 두 값을 채우면 켜진다.

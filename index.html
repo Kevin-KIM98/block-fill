@@ -28,7 +28,7 @@
   </header>
 
   <section class="stats">
-    <div class="stat"><small id="modeLabel">점수</small><b id="score">0</b></div>
+    <div class="stat"><small><span id="modeLabel">점수</span> <span class="lv" id="level">Lv.1</span></small><b id="score">0</b><i class="bar"><i id="levelBar"></i></i></div>
     <button class="stat tap" id="btnRecords" title="내 기록·업적"><small>최고 기록 ▸</small><b id="best">0</b></button>
     <div class="stat points"><small>포인트</small><b id="points">0</b></div>
   </section>
@@ -132,6 +132,7 @@
       <li><b>끌어다 놓기</b><span>아래 블럭 3개 중 하나를 눌러 보드로 끌어다 놓으세요. 놓으면 그 자리에 새 블럭이 생깁니다.</span></li>
       <li><b>줄 지우기</b><span>가로나 세로 한 줄이 꽉 차면 지워지고 칸 수만큼 포인트를 얻습니다. 여러 줄을 한 번에, 연속으로 지우면 배수가 붙습니다.</span></li>
       <li><b>막히면 리프레시</b><span>놓을 곳이 없으면 포인트로 <b>블럭 교체</b>나 <b>보드 리셋</b>을 사세요. 쓸수록 비싸집니다.</span></li>
+      <li><b>레벨이 오르면 더 어렵게</b><span>줄 6개를 지울 때마다 레벨이 오릅니다. 레벨이 오르면 보드에 기본 블럭이 떨어지고 큰 블럭이 자주 나오지만, 줄 클리어 점수 배수도 커집니다.</span></li>
       <li><b>기록과 경쟁</b><span>"최고 기록" 카드를 누르면 내 기록과 업적이 보입니다. 일일 도전은 모두 같은 판으로 하루 한 번 겨룹니다.</span></li>
     </ol>
     <button class="primary" data-close>시작하기</button>

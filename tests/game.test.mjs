@@ -137,6 +137,68 @@ test('연속 클리어는 콤보 배수가 오르고, 끊기면 초기화된다'
   assert.equal(s.combo, 0);
 });
 
+test('레벨: 줄 수로 정해지고 최대치에서 멈춘다', () => {
+  const s = empty();
+  assert.equal(G.levelOf(s), 1);
+  assert.equal(G.linesToNextLevel(s), CFG.level.linesPerLevel);
+  s.lines = CFG.level.linesPerLevel;
+  assert.equal(G.levelOf(s), 2);
+  s.lines = CFG.level.linesPerLevel * 100;
+  assert.equal(G.levelOf(s), CFG.level.max);
+  assert.equal(G.linesToNextLevel(s), 0);
+  assert.equal(G.scoreMult(1), 1);
+  assert.ok(G.scoreMult(CFG.level.max) > 1.5);
+});
+
+test('레벨이 오르면 작은 블럭은 줄고 큰 블럭은 늘며, 레벨 1은 원래 비중 그대로', () => {
+  const small = SHAPES.find((x) => x.name === 'dot_0'), big = SHAPES.find((x) => x.name === 'i5_0'), four = SHAPES.find((x) => x.name === 't4_0');
+  assert.equal(G.shapeWeight(small, 1), small.weight);
+  assert.ok(G.shapeWeight(small, 5) < small.weight);
+  assert.ok(G.shapeWeight(small, 50) >= small.weight * CFG.level.smallFloor);
+  assert.ok(G.shapeWeight(big, 5) > big.weight);
+  assert.equal(G.shapeWeight(four, 9), four.weight);
+  // 레벨 8 판에서 1000번 뽑았을 때 큰 블럭 비중이 레벨 1보다 높다
+  const count = (level) => {
+    const st = G.newGame({ seed: 5 }); st.level = level; st.lines = (level - 1) * CFG.level.linesPerLevel; st.points = 10 ** 9;
+    let big5 = 0, n = 0;
+    for (let i = 0; i < 400; i++) { st.trayRefreshes = 0; assert.ok(G.refreshTray(st)); for (const id of st.tray) { n++; if (SHAPES[id].cells.length >= 5) big5++; } }
+    return big5 / n;
+  };
+  assert.ok(count(8) > count(1) * 1.5, `${count(1)} → ${count(8)}`);
+});
+
+test('레벨업 순간 기본 블럭이 떨어지되 줄을 완성시키지 않고, 점수 배수가 붙는다', () => {
+  const s = empty();
+  s.lines = CFG.level.linesPerLevel - 1; // 한 줄만 더 지우면 레벨 2
+  s.level = 1;
+  for (let c = 0; c < N - 1; c++) s.board[c] = 1;
+  s.tray[0] = shapeByName('dot_0');
+  const ev = G.place(s, 0, 0, N - 1);
+  assert.equal(ev.levelUp, 2);
+  assert.equal(s.level, 2);
+  assert.equal(ev.stones.length, Math.min(CFG.level.maxStones, 1 * CFG.level.stonesPerLevel));
+  for (const i of ev.stones) assert.equal(s.board[i], G.STONE);
+  assert.equal(ev.gain, N * CFG.pointsPerCell); // 배수는 레벨업 전 레벨(1) 기준
+  // 레벨 2에서 지우면 ×1.1
+  const t = empty({ level: 2, lines: CFG.level.linesPerLevel });
+  for (let c = 0; c < N - 1; c++) t.board[c] = 1;
+  t.tray[0] = shapeByName('dot_0');
+  assert.equal(G.place(t, 0, 0, N - 1).gain, Math.round(N * CFG.pointsPerCell * G.scoreMult(2)));
+  // 거의 꽉 찬 판(대각선만 비어 완성 줄 없음)에서 레벨업으로 돌이 떨어져도 완성된 줄은 생기지 않는다
+  const u = empty({ level: 5, lines: 5 * CFG.level.linesPerLevel - 1 });
+  u.board.fill(1); for (let r = 0; r < N; r++) u.board[r * N + r] = 0;
+  u.tray[0] = shapeByName('dot_0');
+  const ev2 = G.place(u, 0, 0, 0); // 0행·0열 동시 클리어 → 레벨 6
+  assert.equal(ev2.lineCount, 2);
+  assert.equal(ev2.levelUp, 6);
+  assert.ok(ev2.stones.length >= 1 && ev2.stones.length <= CFG.level.maxStones);
+  for (const i of ev2.stones) assert.equal(u.board[i], G.STONE);
+  for (let k = 0; k < N; k++) {
+    assert.ok([...Array(N)].some((_, i) => !u.board[k * N + i]), `행 ${k} 완성됨`);
+    assert.ok([...Array(N)].some((_, i) => !u.board[i * N + k]), `열 ${k} 완성됨`);
+  }
+});
+
 test('리프레시 비용은 쓸 때마다 오른다', () => {
   const s = empty({ points: 100000 });
   const tray = [], board = [];
@@ -282,6 +344,17 @@ test('개인 기록: 최신순으로 쌓이고 상한을 넘지 않으며 순위
   assert.equal(rankOf(h, h[0].score - 5), 2);
   addHistory(h, { score: 10 ** 9, mode: 'daily' }); // 일일 도전 점수는 일반 순위에 끼지 않는다
   assert.equal(rankOf(h, 10 ** 9 - 1), 1);
+});
+
+test('level 필드가 없는 옛 판도 그대로 이어진다', () => {
+  const s = empty({ lines: CFG.level.linesPerLevel * 2 });
+  delete s.level;
+  for (let c = 0; c < N - 1; c++) s.board[c] = 1;
+  s.tray[0] = shapeByName('dot_0');
+  const ev = G.place(s, 0, 0, N - 1);
+  assert.equal(s.level, 3);
+  assert.equal(ev.levelUp, 0); // 이미 레벨 3이었던 것으로 본다
+  assert.equal(ev.gain, Math.round(N * CFG.pointsPerCell * G.scoreMult(3)));
 });
 
 test('진행 중인 판은 JSON으로 저장했다가 그대로 이어진다', () => {
