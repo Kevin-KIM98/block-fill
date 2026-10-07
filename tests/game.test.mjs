@@ -97,7 +97,7 @@ test('겹치거나 보드 밖이면 놓을 수 없다', () => {
   assert.equal(G.place(s, 0, -1, 0), null);
 });
 
-test('가로줄이 차면 지워지고 칸 수 x 10 포인트를 얻는다', () => {
+test('가로줄이 차면 지워지고 칸 수 x 10 점수, 그 60%가 포인트로 쌓인다', () => {
   const s = empty();
   for (let c = 0; c < N - 1; c++) s.board[c] = 1;
   s.tray[0] = shapeByName('dot_0');
@@ -105,7 +105,8 @@ test('가로줄이 차면 지워지고 칸 수 x 10 포인트를 얻는다', () 
   assert.equal(ev.lineCount, 1);
   assert.equal(ev.cleared.length, N);
   assert.equal(ev.gain, N * CFG.pointsPerCell);
-  assert.equal(s.points, 80);
+  assert.equal(s.points, Math.round(80 * CFG.pointsRate));
+  assert.equal(s.points, 48);
   assert.equal(s.score, 81);
   assert.equal(s.board.filter(Boolean).length, 0);
 });
@@ -141,9 +142,9 @@ test('리프레시 비용은 쓸 때마다 오른다', () => {
   const tray = [], board = [];
   for (let i = 0; i < 4; i++) { tray.push(G.trayCost(s)); assert.ok(G.refreshTray(s)); }
   for (let i = 0; i < 4; i++) { board.push(G.boardCost(s)); assert.ok(G.refreshBoard(s)); }
-  assert.deepEqual(tray, [50, 75, 113, 169]);
+  assert.deepEqual(tray, [50, 80, 128, 205]);
   assert.deepEqual(board, [200, 400, 800, 1600]);
-  assert.equal(s.points, 100000 - 407 - 3000);
+  assert.equal(s.points, 100000 - 463 - 3000);
 });
 
 test('포인트가 모자라면 리프레시되지 않는다', () => {

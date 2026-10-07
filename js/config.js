@@ -1,16 +1,18 @@
 // 게임 설정값. 밸런스 조정은 이 파일에서만 한다.
 // 배포할 때 version.json의 값도 같이 올린다 (앱이 새 버전을 알아채는 기준).
-export const APP_VERSION = '1.6.0';
+export const APP_VERSION = '1.7.0';
 
 export const CFG = {
   size: 8,                 // 보드 한 변의 칸 수
-  prefill: 14,             // 시작 시 깔리는 기본 블럭 칸 수
-  pointsPerCell: 10,       // 클리어된 칸당 포인트
+  prefill: 10,             // 시작 시 깔리는 기본 블럭 칸 수 (14는 초반 급사가 잦았다)
+  pointsPerCell: 10,       // 클리어된 칸당 점수
+  pointsRate: 0.6,         // 얻은 점수 중 포인트로 적립되는 비율 (리프레시가 늘 공짜가 되지 않게)
+  startPoints: 50,         // 모든 판의 시작 포인트 (블럭 교체 한 번은 보장)
   lineMult: [0, 1, 1.5, 2, 3, 4, 5], // 동시에 지운 줄 수에 따른 배수
   comboStep: 0.25,         // 연속 클리어 1회당 추가 배수
   comboMaxMult: 3,
   trayCostBase: 50,        // 하단 블럭 리프레시 시작 비용
-  trayCostGrowth: 1.5,     // 사용할 때마다 곱해지는 값
+  trayCostGrowth: 1.6,     // 사용할 때마다 곱해지는 값
   boardCostBase: 200,      // 메인 보드 리프레시 시작 비용
   boardCostGrowth: 2,
   streakBonusPerDay: 10,   // 연속 출석 1일당 시작 포인트

@@ -100,7 +100,7 @@ console.log('\n[1] 한 판 끝까지 플레이 (마우스 드래그)');
   await page.click('#dlgHelp [data-close]');
   const v0 = await ui(page);
   check('버전이 제목 옆에 표시된다', /^v\d+\.\d+\.\d+$/.test(v0.version), v0.version);
-  check('시작 포인트는 출석 보너스(10P)', v0.points === 10, `${v0.points}`);
+  check('시작 포인트 = 기본 50P + 출석 보너스 10P', v0.points === 60, `${v0.points}`);
 
   let newBlockOk = true, placedOk = true, moves = 0, refreshes = 0, costs = [], maxMoves = 600;
   while (moves < maxMoves) {
@@ -232,7 +232,7 @@ console.log('\n[4] 일일 도전');
     const u = await ui(page);
     boards.push(JSON.stringify([globalThis.x = null, u.tray, await page.evaluate(() => globalThis.__blockfill.state.board)]));
     if (k === 0) {
-      check('일일 도전: 출석 보너스 없이 0P로 시작', u.points === 0 && u.st.mode === 'daily', `${u.points}P`);
+      check('일일 도전: 출석 보너스 없이 기본 50P로 시작', u.points === 50 && u.st.mode === 'daily', `${u.points}P`);
       // 끝까지 플레이한 뒤 다시 들어가면 막힌다
       for (let i = 0; i < 400; i++) {
         const t = await pickTarget(page, false);

@@ -146,7 +146,7 @@ export function place(state, slot, r, c) {
   }
 
   state.score += placed.length + gain;
-  state.points += gain;
+  state.points += Math.round(gain * (CFG.pointsRate ?? 1)); // 포인트는 점수보다 천천히 쌓인다
   state.moves += 1;
   state.tray[slot] = randomShape(state.rng); // 놓은 자리에 즉시 새 블럭
   updateStatus(state);

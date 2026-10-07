@@ -217,10 +217,10 @@ function startGame(nextMode, forceNew = false) {
   if (usable && !forceNew) {
     state = saved;
   } else if (mode === 'daily') {
-    state = G.newGame({ mode, seed: G.seedFromString(`daily-${today}`), dailyDate: today });
+    state = G.newGame({ mode, seed: G.seedFromString(`daily-${today}`), dailyDate: today, startPoints: CFG.startPoints });
   } else {
     const streak = S.touchStreak();
-    const startPoints = Math.min(streak, CFG.streakBonusMaxDays) * CFG.streakBonusPerDay;
+    const startPoints = CFG.startPoints + Math.min(streak, CFG.streakBonusMaxDays) * CFG.streakBonusPerDay;
     state = G.newGame({ mode, startPoints });
   }
   newBestShown = state.score > best();
