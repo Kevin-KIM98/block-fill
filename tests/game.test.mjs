@@ -4,6 +4,7 @@ import { CFG, APP_VERSION } from '../js/config.js';
 import { SHAPES } from '../js/shapes.js';
 import * as G from '../js/game.js';
 import { migrate, SCHEMA } from '../js/storage.js';
+import { ACHIEVEMENTS, unlock, addHistory, rankOf, HISTORY_MAX } from '../js/achievements.js';
 import { readFileSync } from 'node:fs';
 
 let passed = 0;
@@ -244,7 +245,41 @@ test('저장 데이터 이전: 옛 데이터의 값은 유지하고 빠진 필�
   assert.equal(m.local.streak, 0);
   assert.equal(m.settings.mute, true);
   assert.deepEqual(m.pending, []);
+  assert.deepEqual(m.local.history, []);
+  assert.deepEqual(m.local.achievements, {});
   assert.equal(migrate(null).local.best, 0);
+  // schema 1 → 2: 기존 값은 그대로, 기록·업적 필드만 생긴다
+  const v1 = { schema: 1, local: { best: 9, games: 3, streak: 2, lastPlay: '2026-10-01' } };
+  const m2 = migrate(v1);
+  assert.equal(m2.schema, 2);
+  assert.equal(m2.local.games, 3);
+  assert.deepEqual(m2.local.history, []);
+});
+
+test('업적: 조건을 만족하면 한 번만 달성되고 날짜가 남는다', () => {
+  const got = {};
+  const s = empty({ lines: 1, bestCombo: 3, score: 350 });
+  const local = { games: 0, streak: 0, dailyDone: {} };
+  const first = unlock(got, { state: s, ev: { lineCount: 2, cleared: new Array(16) }, local, mode: 'classic' }, '2026-10-07');
+  assert.deepEqual(first.sort(), ['big_clear', 'combo3', 'double', 'first_line', 'score300'].sort());
+  assert.equal(got.double, '2026-10-07');
+  // 같은 조건을 다시 넣어도 또 달성되지 않는다
+  assert.deepEqual(unlock(got, { state: s, ev: { lineCount: 2, cleared: new Array(16) }, local, mode: 'classic' }, '2026-10-08'), []);
+  // ev가 없어도(판 종료 시) 오류 없이 판정한다
+  assert.deepEqual(unlock(got, { state: s, ev: null, local: { games: 10, streak: 0, dailyDone: {} }, mode: 'classic' }, '2026-10-08'), ['games10']);
+  assert.ok(ACHIEVEMENTS.every((a) => a.id && a.title && a.desc && typeof a.check === 'function'));
+  assert.equal(new Set(ACHIEVEMENTS.map((a) => a.id)).size, ACHIEVEMENTS.length);
+});
+
+test('개인 기록: 최신순으로 쌓이고 상한을 넘지 않으며 순위를 계산한다', () => {
+  const h = [];
+  for (let i = 1; i <= HISTORY_MAX + 5; i++) addHistory(h, { score: i * 10, mode: 'classic' });
+  assert.equal(h.length, HISTORY_MAX);
+  assert.equal(h[0].score, (HISTORY_MAX + 5) * 10); // 가장 최근 판이 맨 앞
+  assert.equal(rankOf(h, 10 ** 9), 1);
+  assert.equal(rankOf(h, h[0].score - 5), 2);
+  addHistory(h, { score: 10 ** 9, mode: 'daily' }); // 일일 도전 점수는 일반 순위에 끼지 않는다
+  assert.equal(rankOf(h, 10 ** 9 - 1), 1);
 });
 
 test('진행 중인 판은 JSON으로 저장했다가 그대로 이어진다', () => {

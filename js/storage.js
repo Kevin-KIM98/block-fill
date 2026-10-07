@@ -1,12 +1,14 @@
 // 기기 저장소. 버전 번호를 두고 구조가 바뀌면 단계별로 이전한다.
 // 규칙: 저장 키를 바꾸거나 통째로 지우지 않는다. 새 필드는 migrate()에서 채운다.
 const KEY = 'blockfill.save';
-export const SCHEMA = 1;
+export const SCHEMA = 2;
 
 const defaults = () => ({
   schema: SCHEMA,
   settings: { mute: false },
-  local: { best: 0, games: 0, streak: 0, lastPlay: null },
+  local: { best: 0, games: 0, streak: 0, lastPlay: null,
+    history: [],        // 최근 판 기록 [{ score, date, mode, lines, combo, moves, refresh }] 최신순
+    achievements: {} }, // { 업적id: 달성 날짜 }
   current: { classic: null, daily: null }, // 진행 중인 판
   dailyDone: {},                            // { 'YYYY-MM-DD': 점수 }
   pending: [],                              // 전송하지 못한 점수
@@ -22,6 +24,11 @@ export function migrate(data) {
   for (const k of Object.keys(base)) {
     if (data[k] == null) data[k] = base[k];
     else if (typeof base[k] === 'object' && !Array.isArray(base[k])) data[k] = { ...base[k], ...data[k] };
+  }
+  if (data.schema < 2) { // v1.5: 개인 기록·업적
+    data.local.history ??= [];
+    data.local.achievements ??= {};
+    data.schema = 2;
   }
   data.schema = SCHEMA;
   return data;

@@ -24,7 +24,7 @@
 
   <section class="stats">
     <div class="stat"><small id="modeLabel">점수</small><b id="score">0</b></div>
-    <div class="stat"><small>최고 기록</small><b id="best">0</b></div>
+    <button class="stat tap" id="btnRecords" title="내 기록·업적"><small>최고 기록 ▸</small><b id="best">0</b></button>
     <div class="stat points"><small>포인트</small><b id="points">0</b></div>
   </section>
 
@@ -107,6 +107,18 @@
   </div>
 </dialog>
 
+<dialog id="dlgRecords">
+  <div class="sheet">
+    <h2>내 기록</h2>
+    <div class="tabs" id="recTabs">
+      <button data-v="history" class="on">기록</button><button data-v="achievements">업적</button>
+    </div>
+    <p class="hint" id="recSummary"></p>
+    <ol id="recList" class="list"></ol>
+    <button class="link" data-close>닫기</button>
+  </div>
+</dialog>
+
 <dialog id="dlgOver">
   <div class="sheet center">
     <p class="badge" id="overBadge" hidden>최고 기록 갱신!</p>
@@ -114,7 +126,9 @@
     <p class="big" id="overScore">0</p>
     <p class="hint" id="overDetail"></p>
     <p class="rankline" id="overRank"></p>
+    <p class="hint" id="overOwn"></p>
     <button class="primary" id="btnAgain">다시 도전</button>
+    <button class="link" id="btnOverRecords">내 기록·업적 보기</button>
     <button class="link" id="btnOverRank">랭킹 보기</button>
     <button class="link" id="btnShare">결과 복사해서 자랑하기</button>
   </div>

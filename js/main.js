@@ -4,6 +4,7 @@ import { SHAPES } from './shapes.js';
 import * as G from './game.js';
 import * as S from './storage.js';
 import * as O from './online.js';
+import { ACHIEVEMENTS, unlock, addHistory, rankOf } from './achievements.js';
 
 const $ = (id) => document.getElementById(id);
 const data = S.load();
@@ -141,7 +142,24 @@ async function loadRivals() {
     } catch { /* 랭킹을 못 불러와도 게임은 계속 */ }
   }
   passed = new Set(rivals.filter((r) => r.score <= state.score).map((r) => r.nickname));
+  for (const h of data.local.history) if (h.score <= state.score) passed.add(`own:${h.score}`);
   updateRival();
+}
+
+// 내 역대 기록(일반 모드) 중 지금 점수 바로 위 기록. 넘어설 때 한 번씩 알린다.
+function ownTargets(score) {
+  const scores = [...new Set(data.local.history.filter((h) => h.mode === 'classic').map((h) => h.score))].sort((a, b) => b - a);
+  for (const sc of scores) {
+    const key = `own:${sc}`;
+    if (sc < score && !passed.has(key) && state.moves > 0) {
+      passed.add(key);
+      const rank = scores.indexOf(sc) + 1;
+      toast(rank === 1 ? '내 최고 기록을 넘었습니다!' : `내 ${rank}위 기록(${fmt(sc)})을 넘었습니다!`);
+      beep(880, 0.1); beep(1175, 0.15, 0.1);
+    }
+  }
+  const idx = scores.findIndex((sc) => sc >= score);
+  return { next: idx >= 0 ? { rank: idx + 1, score: scores[idx] } : null };
 }
 
 function updateRival() {
@@ -156,6 +174,7 @@ function updateRival() {
     }
   }
   const ahead = rivals.filter((r) => r.score >= score).sort((a, b) => a.score - b.score)[0];
+  const own = mode === 'classic' && !rivals.length ? ownTargets(score) : null;
   if (ahead) {
     el.replaceChildren();
     el.append('다음 목표 ');
@@ -164,8 +183,12 @@ function updateRival() {
     el.append(b, ` 님까지 ${fmt(ahead.score - score + 1)}점`);
   } else if (rivals.length) {
     el.textContent = '모든 상대를 제쳤습니다. 지금 1위!';
-  } else if (mode === 'classic' && best() > score) {
-    el.textContent = `내 최고 기록까지 ${fmt(best() - score + 1)}점`;
+  } else if (own?.next) {
+    el.replaceChildren();
+    el.append('내 ');
+    const b = document.createElement('b');
+    b.textContent = `${own.next.rank}위 기록(${fmt(own.next.score)})`;
+    el.append(b, `까지 ${fmt(own.next.score - score + 1)}점`);
   } else if (mode === 'classic' && best() > 0) {
     el.textContent = '최고 기록 경신 중!';
   } else {
@@ -264,6 +287,20 @@ function endDrag() {
 
 // ---------- 진행 ----------
 let newBestShown = false;
+
+function checkAchievements(ev) {
+  const local = { ...data.local, dailyDone: data.dailyDone };
+  const got = unlock(data.local.achievements, { state, ev, local, mode }, S.todayKST());
+  if (!got.length) return;
+  S.save();
+  got.forEach((id, i) => {
+    const a = ACHIEVEMENTS.find((x) => x.id === id);
+    setTimeout(() => {
+      toast(`🏆 업적 달성: ${a.title} — ${a.desc}`, 2400);
+      [660, 880, 1320].forEach((f, k) => beep(f, 0.12, k * 0.08));
+    }, 700 + i * 2500);
+  });
+}
 
 function flash(list, cls, ms) {
   for (const i of list) cells[i].classList.add(cls);
@@ -365,6 +402,7 @@ function doPlace(slot, r, c) {
     newBestShown = true;
     toast('최고 기록 돌파! 어디까지 갈 수 있을까요?');
   }
+  checkAchievements(ev);
   if (state.over) setTimeout(finish, 500);
   else if (state.stuck) beep(180, 0.3);
 }
@@ -383,12 +421,23 @@ async function finish() {
   const isRecord = mode === 'classic' && state.score > prevBest;
   if (mode === 'classic') {
     data.local.best = Math.max(data.local.best, state.score);
-    data.local.games += 1;
   } else {
     data.dailyDone[state.dailyDate] = state.score;
   }
+  data.local.games += 1;
+  const ownRank = mode === 'classic' ? rankOf(data.local.history, state.score) : 0;
+  addHistory(data.local.history, {
+    score: state.score, date: S.todayKST(), mode, lines: state.lines, combo: state.bestCombo,
+    moves: state.moves, refresh: state.trayRefreshes + state.boardRefreshes,
+  });
   data.current[mode] = null;
   S.save();
+  checkAchievements(null);
+
+  const games = data.local.history.filter((h) => h.mode === 'classic').length;
+  $('overOwn').textContent = mode === 'classic' && games > 1
+    ? `내 역대 ${ownRank}위 (${games}판 중)` + (ownRank === 1 ? ' 🥇' : ownRank <= 3 ? ' 🏅' : '')
+    : '';
 
   $('overBadge').hidden = !isRecord;
   $('overScore').textContent = fmt(state.score);
@@ -564,6 +613,64 @@ function openRank(period) {
   loadRank();
 }
 $('btnRank').addEventListener('click', () => openRank());
+
+// ---------- 내 기록·업적 ----------
+let recTab = 'history';
+const dateShort = (d) => (d || '').slice(5).replace('-', '/');
+
+function loadRecords() {
+  const list = $('recList');
+  if (recTab === 'history') {
+    const hist = data.local.history;
+    const classic = hist.filter((h) => h.mode === 'classic');
+    const top = [...classic].sort((a, b) => b.score - a.score).slice(0, 5);
+    const avg = classic.length ? Math.round(classic.reduce((a, h) => a + h.score, 0) / classic.length) : 0;
+    $('recSummary').textContent = classic.length
+      ? `일반 모드 ${classic.length}판 · 평균 ${fmt(avg)}점 · 최고 ${fmt(Math.max(best(), top[0]?.score || 0))}점`
+      : '아직 끝낸 판이 없습니다. 한 판 끝내면 여기에 기록됩니다.';
+    if (!hist.length) { listMessage(list, '첫 판을 끝내고 기록을 남겨 보세요!'); return; }
+    const row = (h, rk) => {
+      const li = document.createElement('li');
+      const r = Object.assign(document.createElement('span'), { className: 'rk', textContent: rk });
+      const nm = Object.assign(document.createElement('span'), { className: 'nm' });
+      nm.textContent = h.mode === 'daily' ? `오늘의 도전 ${dateShort(h.date)}` : dateShort(h.date);
+      const sm = document.createElement('small');
+      sm.textContent = `줄 ${h.lines} · 콤보 ${h.combo} · 리프레시 ${h.refresh}회`;
+      nm.appendChild(sm);
+      const sc = Object.assign(document.createElement('span'), { className: 'sc', textContent: fmt(h.score) });
+      li.append(r, nm, sc);
+      return li;
+    };
+    const head = (text) => Object.assign(document.createElement('li'), { className: 'empty', textContent: text });
+    list.replaceChildren(head('🏆 개인 TOP 5'), ...top.map((h, i) => row(h, i + 1)),
+      head('🕘 최근 판'), ...hist.slice(0, 10).map((h) => row(h, '·')));
+  } else {
+    const got = data.local.achievements;
+    const n = Object.keys(got).length;
+    $('recSummary').textContent = `${ACHIEVEMENTS.length}개 중 ${n}개 달성`;
+    list.replaceChildren(...ACHIEVEMENTS.map((a) => {
+      const li = document.createElement('li');
+      li.className = got[a.id] ? '' : 'locked';
+      const ic = Object.assign(document.createElement('span'), { className: 'ic', textContent: got[a.id] ? '🏆' : '🔒' });
+      const nm = Object.assign(document.createElement('span'), { className: 'nm', textContent: a.title });
+      const sm = document.createElement('small');
+      sm.textContent = a.desc + (got[a.id] ? ` · ${dateShort(got[a.id])}` : '');
+      nm.appendChild(sm);
+      li.append(ic, nm);
+      return li;
+    }));
+  }
+}
+$('recTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  for (const b of $('recTabs').children) b.classList.toggle('on', b === btn);
+  recTab = btn.dataset.v;
+  loadRecords();
+});
+function openRecords() { $('dlgRecords').showModal(); loadRecords(); }
+$('btnRecords').addEventListener('click', openRecords);
+$('btnOverRecords').addEventListener('click', openRecords);
 $('btnOverRank').addEventListener('click', () => openRank(mode === 'daily' ? 'daily' : 'week'));
 
 // ---------- 친구 ----------
