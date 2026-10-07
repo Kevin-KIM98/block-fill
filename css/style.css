@@ -250,6 +250,7 @@ dialog::backdrop { background: rgba(5,6,12,.75); }
 .sheet label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
 .sheet input { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; color: var(--text); font-size: 16px; min-width: 0; user-select: text; -webkit-user-select: text; }
 .hint { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.hint.warn { color: var(--danger); }
 .sheet .row { display: flex; gap: 8px; }
 .sheet .row input { flex: 1; }
 .sheet .row .primary { white-space: nowrap; padding: 10px 12px; }

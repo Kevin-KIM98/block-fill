@@ -914,8 +914,20 @@ function listMessage(listEl, msg) {
   listEl.replaceChildren(li);
 }
 
+// 랭킹 창 아래 실시간 보고 상태 (문제가 있으면 바로 보이게)
+function rankNote() {
+  const st = O.liveStatus();
+  const el = $('rankNote');
+  if (st.missing) { el.textContent = '⚠️ 서버에 실시간 함수가 없습니다. supabase/migrations/002_live_score.sql을 SQL Editor에서 실행해 주세요.'; el.classList.add('warn'); return; }
+  el.classList.remove('warn');
+  if (st.lastError) { el.textContent = `⚠️ 실시간 보고 실패: ${st.lastError}`; el.classList.add('warn'); return; }
+  const ago = st.lastOk ? `${Math.max(0, Math.round((Date.now() - st.lastOk) / 1000))}초 전 내 점수 보고` : '아직 이번 판 점수를 보고하지 않음';
+  el.textContent = `플레이 중인 점수도 실시간 반영 · 8초마다 갱신 · ${ago} (v${APP_VERSION})`;
+}
+
 async function loadRank(quiet = false) {
   const list = $('rankList');
+  rankNote();
   if (!quiet) listMessage(list, '불러오는 중…');
   try {
     const rows = await O.leaderboard(rankSel.scope, rankSel.period);
