@@ -17,7 +17,9 @@
 
 ## 명령
 - 테스트: `node tests/game.test.mjs`
+- 브라우저 검수(E2E): `python3 -m http.server 8123 &` 뒤 `node tests/e2e.mjs` (Playwright 필요. 결과 화면은 `tests/e2e-out/`)
 - 실행: `python3 -m http.server 8000`
+- 검수 기록: `design/progress.md`에 반복마다 한 줄씩 남긴다
 
 ## 반드시 지킬 것 (사용자 데이터 보존)
 1. `localStorage` 키 `blockfill.save`의 이름을 바꾸거나 `localStorage.clear()`를 호출하지 않는다.
