@@ -1,6 +1,6 @@
 // 게임 설정값. 밸런스 조정은 이 파일에서만 한다.
 // 배포할 때 version.json의 값도 같이 올린다 (앱이 새 버전을 알아채는 기준).
-export const APP_VERSION = '2.0.0';
+export const APP_VERSION = '2.1.0';
 
 export const CFG = {
   size: 8,                 // 보드 한 변의 칸 수

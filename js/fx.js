@@ -1,17 +1,25 @@
 // 캔버스 파티클 이펙트. 보드 위에 겹쳐 그린다. 규칙(game.js)과는 무관하며, 꺼도 게임은 그대로 돈다.
 // 좌표는 모두 캔버스 기준 픽셀. 호출하는 쪽(main.js)이 칸 위치를 넘겨준다.
+//
+// 연출 방향: "내 블럭이 줄을 공격한다".
+//   놓은 자리(impact)에서 번개가 줄로 내리꽂히고 → 레이저가 줄을 따라 쓸고 지나가며 → 칸이 가까운 순서로 연쇄 폭발한다.
+//   콤보가 커지면 불기둥·폭죽(로켓이 올라가 터짐)·레이저 방사가 더해진다.
 
 const TAU = Math.PI * 2;
 const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+// 강도 조절 (1이 기본). 과하면 줄이고 약하면 올린다.
+export const INTENSITY = { particles: 1, shake: 1 };
 
 export function createFX(canvas) {
   const ctx = canvas.getContext('2d');
   let W = 0, H = 0, dpr = 1;
   let parts = [];          // 살아 있는 파티클
-  let fever = 0;           // 0~3: 콤보 열기 단계. 0이면 테두리 불꽃 없음
-  let feverBox = null;     // 보드 사각형 {x, y, w, h} (캔버스 좌표)
+  let fever = 0;           // 0~3: 콤보 열기 단계
+  let feverBox = null;     // 보드 사각형 {x, y, w, h}
   let raf = 0, last = 0, hue = 0;
-  let reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function resize(w, h) {
     dpr = Math.min(2, devicePixelRatio || 1);
@@ -20,104 +28,169 @@ export function createFX(canvas) {
     canvas.style.width = `${w}px`; canvas.style.height = `${h}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-
-  function add(p) { parts.push(p); kick(); }
+  function add(p) { p.life = 0; p.delay ??= 0; parts.push(p); kick(); }
   function kick() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); } }
+  const n = (k) => Math.round(k * INTENSITY.particles);
 
-  // ---------- 파티클 종류 ----------
-  // shard: 색 조각. 중력·회전. spark: 작은 빛점(가산 합성, 꼬리). ring: 퍼지는 원.
-  // beam: 줄을 따라가는 빛줄기. flash: 화면 번쩍. confetti: 팔랑이는 종이. ray: 방사형 빛살. ember: 테두리 불씨.
-  function shard(x, y, color, power) {
-    const a = rnd(0, TAU), sp = rnd(60, 260) * power;
-    add({ t: 'shard', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 120 * power, g: 700, size: rnd(4, 10) * Math.min(1.6, power),
-      color, rot: rnd(0, TAU), vr: rnd(-12, 12), life: 0, ttl: rnd(0.5, 0.9) });
-  }
-  function spark(x, y, color, power, speed = 1) {
-    const a = rnd(0, TAU), sp = rnd(200, 520) * power * speed;
-    add({ t: 'spark', x, y, px: x, py: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 200, drag: 0.9, size: rnd(1.5, 3.5),
-      color, life: 0, ttl: rnd(0.3, 0.6) });
-  }
-  function ring(x, y, color, r0, r1, ttl = 0.5, width = 6) { add({ t: 'ring', x, y, color, r0, r1, width, life: 0, ttl }); }
-  function beam(x, y, w, h, color) { add({ t: 'beam', x, y, w, h, color, life: 0, ttl: 0.45 }); }
-  function flash(color, alpha = 0.35, ttl = 0.3) { add({ t: 'flash', color, alpha, life: 0, ttl }); }
-  function confetti(x, y, color, power = 1) {
-    add({ t: 'confetti', x, y, vx: rnd(-220, 220) * power, vy: rnd(-520, -220) * power, g: 520, w: rnd(5, 9), h: rnd(8, 14),
-      color, rot: rnd(0, TAU), vr: rnd(-9, 9), ph: rnd(0, TAU), life: 0, ttl: rnd(1.2, 2) });
-  }
-  function ray(x, y, color, angle, len) { add({ t: 'ray', x, y, color, angle, len, life: 0, ttl: 0.6 }); }
-  function ember(x, y, color) {
-    add({ t: 'spark', x, y, px: x, py: y, vx: rnd(-40, 40), vy: rnd(-140, -60), g: -60, drag: 0.98, size: rnd(1.2, 2.6), color, life: 0, ttl: rnd(0.5, 1) });
+  // ---------- 파티클 생성 ----------
+  // shard: 색 조각(중력·회전) / spark: 빛점(가산, 꼬리) / ring: 충격파 / flash: 화면 번쩍 / ray: 빛살
+  // flame: 불꽃(위로 오르며 노랑→빨강) / laser: 줄을 쓸고 가는 빔 / bolt: 번개 / rocket: 폭죽 로켓(터지면 spark 뭉치)
+  const shard = (x, y, color, power, delay = 0) => {
+    const a = rnd(0, TAU), sp = rnd(80, 300) * power;
+    add({ t: 'shard', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 140 * power, g: 900, size: rnd(3, 7) * Math.min(1.3, power),
+      color, rot: rnd(0, TAU), vr: rnd(-14, 14), ttl: rnd(0.3, 0.55), delay });
+  };
+  const spark = (x, y, color, power, speed = 1, delay = 0, g = 220) => {
+    const a = rnd(0, TAU), sp = rnd(220, 560) * power * speed;
+    add({ t: 'spark', x, y, px: x, py: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g, drag: 0.9, size: rnd(1.5, 3.5), color, ttl: rnd(0.3, 0.65), delay });
+  };
+  const ring = (x, y, color, r0, r1, ttl = 0.5, width = 6, delay = 0) => add({ t: 'ring', x, y, color, r0, r1, width, ttl, delay });
+  const flash = (color, alpha = 0.35, ttl = 0.3) => add({ t: 'flash', color, alpha, ttl });
+  const ray = (x, y, color, angle, len, delay = 0) => add({ t: 'ray', x, y, color, angle, len, ttl: 0.6, delay });
+  const flame = (x, y, power = 1, delay = 0) =>
+    add({ t: 'flame', x, y, vx: rnd(-30, 30), vy: rnd(-160, -70) * power, size: rnd(6, 14) * power, ttl: rnd(0.35, 0.7), delay, ph: rnd(0, TAU) });
+  const laser = (x, y, angle, len, color, delay = 0, width = 10) => add({ t: 'laser', x, y, angle, len, color, width, ttl: 0.42, delay });
+  const bolt = (x1, y1, x2, y2, color, delay = 0) => add({ t: 'bolt', x1, y1, x2, y2, color, ttl: 0.22, delay, seed: Math.random() });
+  const rocket = (x, y, color, power = 1, delay = 0) =>
+    add({ t: 'rocket', x, y, vx: rnd(-80, 80), vy: rnd(-620, -480) * Math.min(1.3, power), g: 560, color, ttl: rnd(0.45, 0.65), delay, power });
+
+  function burst(x, y, color, power) { // 폭죽이 터지는 순간
+    ring(x, y, '#fff', 4, 70 * power, 0.45, 5);
+    ring(x, y, color, 4, 110 * power, 0.7, 8);
+    flash(color, 0.12, 0.2);
+    const nn = n(70 * power);
+    for (let k = 0; k < nn; k++) spark(x, y, k % 4 === 0 ? '#fff' : color, 1.1 * power, 1.3, 0, 300);
+    for (let k = 0; k < n(12); k++) spark(x, y, color, 0.5 * power, 0.6, 0.08, 400); // 두 번째 작은 터짐
+    for (let k = 0; k < n(14); k++) flame(x + rnd(-14, 14), y + rnd(-14, 14), 1);
   }
 
-  // ---------- 장면별 연출 ----------
-  const PALETTE = ['#ff5d6c', '#ffb020', '#ffd23f', '#4cd97b', '#4fd1ff', '#6c7bff', '#c36bff', '#ff6fb5', '#ffffff'];
+  // ---------- 장면 ----------
+  const HOT = ['#ff5d6c', '#ffb020', '#ffd23f', '#ff6a3d', '#ffffff'];
+  const COOL = ['#4fd1ff', '#6c7bff', '#c36bff', '#4cd97b', '#ffffff'];
 
-  // 줄 클리어 폭발. cells: [{x, y, color}], lines: [{x, y, w, h}] (줄의 사각형), power: 1(한 줄)~3+(여러 줄·콤보)
-  function explode({ cells, lines, center, u, power = 1 }) {
+  // 줄 클리어 공격.
+  // impact: 놓은 블럭 중심 / cells: [{x, y, color}] / lines: [{cx, cy, horiz, len}] / power: 1~4
+  function explode({ impact, cells, lines, center, u, power = 1 }) {
     if (reduce) return;
-    const p = Math.min(3, power);
-    const perCell = cells.length > 24 ? 4 : 7;
-    for (const c of cells) {
-      for (let k = 0; k < perCell * Math.min(2, p); k++) shard(c.x, c.y, c.color, 0.7 + p * 0.35);
-      for (let k = 0; k < 3 + p * 2; k++) spark(c.x, c.y, k % 2 ? c.color : '#fff', 0.6 + p * 0.3);
-    }
+    const p = Math.min(4, power);
+    const dist = (c) => Math.hypot(c.x - impact.x, c.y - impact.y);
+    const maxD = Math.max(1, ...cells.map(dist));
+    const wave = 0.035 * (u / 45); // 칸 하나 멀어질 때마다 늦게 터지는 시간(초)
+
+    // 1) 임팩트: 놓은 자리에서 충격파 + 번개
+    ring(impact.x, impact.y, '#fff', 2, u * 1.6, 0.35, 5);
     for (const l of lines) {
-      beam(l.x, l.y, l.w, l.h, '#fff');
-      ring(l.x + l.w / 2, l.y + l.h / 2, '#fff', u * 0.4, Math.max(l.w, l.h) * 0.8, 0.45, 4 + p * 2);
+      for (let k = 0; k < 2; k++) bolt(impact.x, impact.y, l.cx + rnd(-u, u), l.cy + rnd(-u, u), k ? '#fff' : HOT[1], k * 0.03);
+      // 2) 레이저가 줄을 따라 양쪽으로 쓸고 나간다
+      const a = l.horiz ? 0 : Math.PI / 2;
+      laser(impact.x, impact.y, a, l.len, p >= 3 ? COOL[0] : HOT[1], 0.05, 8 + p * 3);
+      laser(impact.x, impact.y, a + Math.PI, l.len, p >= 3 ? COOL[0] : HOT[1], 0.05, 8 + p * 3);
     }
+    // 3) 칸이 가까운 순서로 연쇄 폭발
+    const perCell = cells.length > 24 ? 2 : 3;
+    for (const c of cells) {
+      const d = dist(c) / u * wave;
+      for (let k = 0; k < n(perCell); k++) shard(c.x, c.y, c.color, 0.8 + p * 0.2, d);
+      for (let k = 0; k < n(5 + p * 3); k++) spark(c.x, c.y, k % 3 ? c.color : '#fff', 0.7 + p * 0.3, 1, d);
+      for (let k = 0; k < n(3 + p); k++) flame(c.x + rnd(-u * 0.3, u * 0.3), c.y, 0.8 + p * 0.3, d);
+      ring(c.x, c.y, c.color, 2, u * 0.9, 0.3, 3, d);
+    }
+    // 4) 콤보가 크면 전체 연출
     if (p >= 2) {
-      flash('#fff', 0.18 + p * 0.07, 0.25 + p * 0.05);
-      ring(center.x, center.y, '#ffb020', u, u * 9, 0.7, 10);
-      for (let k = 0; k < 10 * p; k++) spark(center.x, center.y, PALETTE[k % PALETTE.length], 1.2 + p * 0.3, 1.4);
+      flash('#fff', 0.16 + p * 0.06, 0.22 + p * 0.05);
+      ring(center.x, center.y, HOT[1], u, u * 9, 0.7, 10, maxD / u * wave);
     }
     if (p >= 3) {
-      for (let k = 0; k < 40; k++) confetti(center.x + rnd(-u * 3, u * 3), center.y, PALETTE[k % PALETTE.length], 1.1);
-      for (let k = 0; k < 16; k++) ray(center.x, center.y, '#fff', (k / 16) * TAU, u * 6);
+      for (let k = 0; k < 2 + (p - 3) * 2; k++) rocket(center.x + rnd(-u * 2, u * 2), center.y, pick(p >= 4 ? COOL : HOT), 1 + (p - 2) * 0.3, 0.15 + k * 0.12);
+      for (let k = 0; k < n(14 * p); k++) spark(center.x, center.y, pick(HOT), 1.3 + p * 0.25, 1.4, maxD / u * wave);
+    }
+    if (p >= 4) {
+      for (let k = 0; k < 12; k++) laser(center.x, center.y, (k / 12) * TAU + hue / 360, u * 7, k % 2 ? COOL[2] : '#fff', 0.1 + k * 0.02, 6);
+      for (let k = 0; k < 16; k++) ray(center.x, center.y, '#fff', (k / 16) * TAU, u * 6, 0.1);
     }
   }
 
-  // 블럭이 보드에 닿을 때 작은 먼지
-  function land(cells, color) {
+  // 블럭이 보드에 닿을 때: 작은 충격파 + 먼지
+  function land(cells, color, impact, u) {
     if (reduce) return;
-    for (const c of cells) for (let k = 0; k < 3; k++) {
-      add({ t: 'shard', x: c.x + rnd(-6, 6), y: c.y + 8, vx: rnd(-50, 50), vy: rnd(-90, -30), g: 500, size: rnd(2, 4), color, rot: 0, vr: rnd(-4, 4), life: 0, ttl: 0.3 });
+    if (impact) ring(impact.x, impact.y, color, 2, u * 1.2, 0.25, 3);
+    for (const c of cells) for (let k = 0; k < n(3); k++) {
+      add({ t: 'shard', x: c.x + rnd(-6, 6), y: c.y + 8, vx: rnd(-60, 60), vy: rnd(-100, -30), g: 520, size: rnd(2, 4), color, rot: 0, vr: rnd(-4, 4), ttl: 0.3 });
     }
   }
 
-  // 레벨업: 방사형 빛살 + 큰 원 + 종이
+  // 레벨업: 빛살 + 폭죽 3발 + 불기둥
   function levelUp(center, u) {
     if (reduce) return;
-    flash('#4fd1ff', 0.25, 0.4);
-    for (let k = 0; k < 24; k++) ray(center.x, center.y, k % 2 ? '#4fd1ff' : '#fff', (k / 24) * TAU + rnd(-0.1, 0.1), u * rnd(5, 8));
-    ring(center.x, center.y, '#4fd1ff', u, u * 10, 0.8, 12);
-    ring(center.x, center.y, '#fff', u * 0.5, u * 7, 0.6, 5);
-    for (let k = 0; k < 60; k++) confetti(center.x + rnd(-u * 4, u * 4), center.y + rnd(-u, u), PALETTE[k % PALETTE.length], 1.2);
-    for (let k = 0; k < 40; k++) spark(center.x, center.y, PALETTE[k % PALETTE.length], 1.6, 1.3);
+    flash(COOL[0], 0.25, 0.4);
+    for (let k = 0; k < 24; k++) ray(center.x, center.y, k % 2 ? COOL[0] : '#fff', (k / 24) * TAU + rnd(-0.1, 0.1), u * rnd(5, 8));
+    ring(center.x, center.y, COOL[0], u, u * 10, 0.8, 12);
+    for (let k = 0; k < 3; k++) rocket(center.x + (k - 1) * u * 2.5, center.y + u * 3, COOL[k], 1.2, k * 0.15);
+    for (let k = 0; k < n(30); k++) flame(center.x + rnd(-u * 3, u * 3), center.y + u * 3, 1.4, rnd(0, 0.3));
   }
 
-  // 보드를 완전히 비웠을 때: 불꽃놀이 3발
+  // 보드를 완전히 비웠을 때: 레이저 십자 + 폭죽 5발
   function perfect(center, u) {
     if (reduce) return;
-    flash('#ffd23f', 0.45, 0.5);
-    const shots = [[0, 0], [-u * 3, -u * 2], [u * 3, u * 1.5]];
-    shots.forEach(([dx, dy], i) => setTimeout(() => {
-      const color = PALETTE[(i * 3) % PALETTE.length];
-      ring(center.x + dx, center.y + dy, color, u * 0.3, u * 6, 0.7, 8);
-      for (let k = 0; k < 70; k++) spark(center.x + dx, center.y + dy, k % 3 ? color : '#fff', 1.6, 1.5);
-      for (let k = 0; k < 20; k++) shard(center.x + dx, center.y + dy, color, 1.8);
-      kick();
-    }, i * 260));
-    for (let k = 0; k < 90; k++) confetti(center.x + rnd(-u * 4, u * 4), center.y - u * 3, PALETTE[k % PALETTE.length], 1.3);
+    flash(HOT[2], 0.45, 0.5);
+    for (let k = 0; k < 8; k++) laser(center.x, center.y, (k / 8) * TAU, u * 8, k % 2 ? HOT[2] : '#fff', k * 0.03, 10);
+    for (let k = 0; k < 5; k++) rocket(center.x + rnd(-u * 3, u * 3), center.y + u * 2, pick([...HOT, ...COOL]), 1.4, 0.1 + k * 0.16);
+    ring(center.x, center.y, '#fff', u, u * 11, 0.9, 14);
   }
 
-  // 콤보 열기: 0이면 끔. 보드 테두리에서 불씨가 계속 피어오른다.
+  // 콤보 열기: 0이면 끔. 보드 테두리가 타오른다.
   function setFever(level, box) {
     fever = reduce ? 0 : Math.max(0, Math.min(3, level));
     feverBox = box;
     if (fever) kick();
   }
 
-  // ---------- 프레임 ----------
+  // ---------- 그리기 ----------
+  function drawFlame(p, k) {
+    const a = 1 - k;
+    const r = p.size * (1 - k * 0.7);
+    const h = 55 - k * 45; // 노랑 → 빨강
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a * 0.9;
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+    g.addColorStop(0, `hsla(${h + 10}, 100%, 85%, 1)`);
+    g.addColorStop(0.5, `hsla(${h}, 100%, 55%, .8)`);
+    g.addColorStop(1, `hsla(${h - 10}, 100%, 40%, 0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  function drawLaser(p, k) {
+    const sweep = Math.min(1, k * 2.8);        // 빠르게 뻗고
+    const a = k < 0.5 ? 1 : (1 - k) * 2;       // 뒤늦게 사라진다
+    const len = p.len * sweep;
+    const ex = p.x + Math.cos(p.angle) * len, ey = p.y + Math.sin(p.angle) * len;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    ctx.globalAlpha = a * 0.55; ctx.strokeStyle = p.color; ctx.lineWidth = p.width * 2.2; ctx.shadowBlur = 24; ctx.shadowColor = p.color;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.globalAlpha = a; ctx.strokeStyle = '#fff'; ctx.lineWidth = p.width * 0.35; ctx.shadowBlur = 0;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.restore();
+    if (sweep < 1 && Math.random() < 0.8) spark(ex, ey, Math.random() < 0.5 ? '#fff' : p.color, 0.5, 0.8, 0, 300); // 레이저 끝에서 튀는 불똥
+  }
+  function drawBolt(p, k) {
+    const a = (1 - k) * (0.6 + 0.4 * Math.sin(k * 60 + p.seed * 10)); // 깜빡임
+    const segs = 9;
+    const dx = p.x2 - p.x1, dy = p.y2 - p.y1, L = Math.hypot(dx, dy) || 1;
+    const nx = -dy / L, ny = dx / L;
+    const pts = [[p.x1, p.y1]];
+    for (let i = 1; i < segs; i++) {
+      const t = i / segs, j = (Math.sin(i * 12.9898 + p.seed * 78.233 + k * 40) * 43758.5453) % 1;
+      const off = (j - 0.5) * L * 0.22;
+      pts.push([p.x1 + dx * t + nx * off, p.y1 + dy * t + ny * off]);
+    }
+    pts.push([p.x2, p.y2]);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    for (const [w, c, al] of [[7, p.color, a * 0.5], [2, '#fff', a]]) {
+      ctx.strokeStyle = c; ctx.lineWidth = w; ctx.globalAlpha = al; ctx.shadowBlur = w === 7 ? 16 : 0; ctx.shadowColor = p.color;
+      ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
@@ -126,7 +199,6 @@ export function createFX(canvas) {
 
     if (fever && feverBox) {
       const { x, y, w, h } = feverBox;
-      // 테두리 빛 (단계가 높을수록 두껍고 색이 돈다)
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       ctx.lineWidth = 2 + fever * 2;
@@ -134,20 +206,24 @@ export function createFX(canvas) {
       ctx.shadowBlur = 10 + fever * 8; ctx.shadowColor = ctx.strokeStyle;
       ctx.beginPath(); ctx.roundRect(x, y, w, h, 12); ctx.stroke();
       ctx.restore();
-      // 불씨
-      const rate = fever * 14 * dt;
+      // 아래 테두리에서 불꽃이 타오르고, 단계가 높으면 옆면에서도
+      const rate = fever * 10 * dt * INTENSITY.particles;
       for (let k = 0; k < rate + (Math.random() < rate % 1 ? 1 : 0); k++) {
         const side = Math.random();
-        const px = side < 0.5 ? x + Math.random() * w : (side < 0.75 ? x : x + w);
-        const py = side < 0.5 ? (Math.random() < 0.5 ? y : y + h) : y + Math.random() * h;
-        ember(px, py, fever >= 3 ? `hsl(${(hue + Math.random() * 60) % 360} 100% 65%)` : (Math.random() < 0.5 ? '#ffb020' : '#ff5d6c'));
+        if (fever < 2 || side < 0.6) flame(x + Math.random() * w, y + h, 0.6 + fever * 0.2);
+        else flame(side < 0.8 ? x : x + w, y + Math.random() * h, 0.5 + fever * 0.15);
       }
     }
 
     const alive = [];
-    for (const p of parts) {
+    const list = parts; parts = []; // 그리는 도중 새로 생기는 파티클(로켓 꼬리·폭발)은 parts에 쌓인다
+    for (const p of list) {
+      if (p.delay > 0) { p.delay -= dt; alive.push(p); continue; }
       p.life += dt;
-      if (p.life >= p.ttl) continue;
+      if (p.life >= p.ttl) {
+        if (p.t === 'rocket') burst(p.x, p.y, p.color, p.power);
+        continue;
+      }
       const k = p.life / p.ttl, a = 1 - k;
       switch (p.t) {
         case 'shard':
@@ -172,28 +248,8 @@ export function createFX(canvas) {
           ctx.restore();
           break;
         }
-        case 'beam': {
-          const grow = Math.min(1, k * 3);
-          ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a;
-          const horiz = p.w >= p.h;
-          const g = horiz ? ctx.createLinearGradient(p.x, 0, p.x + p.w, 0) : ctx.createLinearGradient(0, p.y, 0, p.y + p.h);
-          g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, p.color); g.addColorStop(1, 'rgba(255,255,255,0)');
-          ctx.fillStyle = g;
-          ctx.shadowBlur = 24; ctx.shadowColor = '#ffb020';
-          if (horiz) ctx.fillRect(p.x + (p.w * (1 - grow)) / 2, p.y, p.w * grow, p.h);
-          else ctx.fillRect(p.x, p.y + (p.h * (1 - grow)) / 2, p.w, p.h * grow);
-          ctx.restore();
-          break;
-        }
         case 'flash':
           ctx.save(); ctx.globalAlpha = p.alpha * a; ctx.fillStyle = p.color; ctx.fillRect(0, 0, W, H); ctx.restore();
-          break;
-        case 'confetti':
-          p.vy += p.g * dt; p.vx *= 0.99; p.x += (p.vx + Math.sin(p.life * 9 + p.ph) * 60) * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
-          ctx.save(); ctx.globalAlpha = Math.min(1, a * 2); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
-          ctx.scale(Math.cos(p.life * 7 + p.ph), 1);
-          ctx.fillStyle = p.color; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
-          ctx.restore();
           break;
         case 'ray': {
           const len = p.len * Math.min(1, k * 2.5);
@@ -203,10 +259,25 @@ export function createFX(canvas) {
           ctx.restore();
           break;
         }
+        case 'flame':
+          p.x += (p.vx + Math.sin(p.life * 18 + p.ph) * 25) * dt; p.y += p.vy * dt;
+          drawFlame(p, k);
+          break;
+        case 'laser': drawLaser(p, k); break;
+        case 'bolt': drawBolt(p, k); break;
+        case 'rocket':
+          p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+          // 꼬리
+          add({ t: 'spark', x: p.x, y: p.y, px: p.x, py: p.y, vx: rnd(-30, 30), vy: rnd(20, 80), g: 100, drag: 0.95, size: 2, color: Math.random() < 0.5 ? '#fff' : p.color, ttl: 0.3 });
+          ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = p.color; ctx.shadowBlur = 18; ctx.shadowColor = p.color;
+          ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, TAU); ctx.fill();
+          ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, TAU); ctx.fill(); ctx.restore();
+          for (let q = 0; q < 2; q++) flame(p.x + rnd(-4, 4), p.y + 6, 0.5);
+          break;
       }
       alive.push(p);
     }
-    parts = alive;
+    parts = alive.concat(parts);
     if (parts.length || fever) raf = requestAnimationFrame(frame);
     else { raf = 0; ctx.clearRect(0, 0, W, H); }
   }

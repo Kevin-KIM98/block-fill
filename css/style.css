@@ -93,7 +93,7 @@ nav { display: flex; gap: 6px; flex-wrap: wrap; }
 .cell.ghost::before { background: rgba(255,255,255,.28); }
 .cell.will::before { filter: brightness(1.5); box-shadow: 0 0 10px var(--accent); }
 .cell.pop::after { content: ""; position: absolute; inset: 2px; border-radius: 5px; background: var(--pc, #fff);
-  box-shadow: 0 0 12px var(--pc, #fff); animation: pop .5s forwards; }
+  box-shadow: 0 0 12px var(--pc, #fff); animation: pop .45s both; animation-delay: var(--d, 0s); }
 @keyframes pop { 30% { transform: scale(1.2); filter: brightness(2); opacity: 1; } to { transform: scale(0) rotate(90deg); opacity: 0; } }
 #board.flash { animation: flash .4s; }
 @keyframes flash { 30% { box-shadow: 0 0 0 3px var(--accent), 0 0 30px var(--accent); } }

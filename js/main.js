@@ -56,6 +56,13 @@ function boom(power = 1, delay = 0) {
   } catch { /* 무시 */ }
 }
 
+// 진동(손맛). 단계별 패턴. 지원하지 않는 기기(아이폰 등)에서는 조용히 무시된다.
+const BUZZ = {
+  land: 12, clear1: [18, 20, 30], clear2: [25, 25, 50, 25, 35], clear3: [40, 25, 80, 25, 60, 25, 40],
+  clear4: [60, 20, 120, 20, 90, 20, 60, 20, 160], perfect: [80, 40, 160, 40, 240], levelUp: [50, 30, 50, 30, 120], refresh: 20,
+};
+function buzz(pattern) { try { navigator.vibrate?.(pattern); } catch { /* 무시 */ } }
+
 // ---------- 공통 ----------
 let toastTimer = 0;
 function toast(msg, ms = 1800) {
@@ -438,7 +445,10 @@ function doPlace(slot, r, c) {
   const shapeColor = SHAPES[ev.shapeId].color;
   const stay = ev.placed.filter((i) => !ev.cleared.includes(i));
   flash(stay, 'drop', 200);
-  fx.land(stay.map(cellXY), colorOf(shapeColor));
+  const pp = ev.placed.map(cellXY);
+  const impact = { x: pp.reduce((a, q) => a + q.x, 0) / pp.length, y: pp.reduce((a, q) => a + q.y, 0) / pp.length };
+  fx.land(stay.map(cellXY), colorOf(shapeColor), impact, pp[0].u);
+  if (!ev.lineCount) buzz(BUZZ.land);
 
   if (ev.lineCount > 0) {
     const tier = comboTier(ev);
@@ -447,15 +457,22 @@ function doPlace(slot, r, c) {
       colors[i] = colorOf(before[i] || shapeColor);
       cells[i].style.setProperty('--pc', colors[i]);
     }
-    flash(ev.cleared, 'pop', 500);
     const u = cellXY(0).u;
-    const lines = [
-      ...ev.rows.map((row) => { const a = cellXY(row * N), b = cellXY(row * N + N - 1); return { x: a.x - u / 2, y: a.y - u * 0.3, w: b.x - a.x + u, h: u * 0.6 }; }),
-      ...ev.cols.map((col) => { const a = cellXY(col), b = cellXY((N - 1) * N + col); return { x: a.x - u * 0.3, y: a.y - u / 2, w: u * 0.6, h: b.y - a.y + u }; }),
-    ];
     const pts = ev.cleared.map(cellXY);
+    // 놓은 자리에서 먼 칸일수록 늦게 터진다 (연쇄 폭발)
+    let maxDelay = 0;
+    ev.cleared.forEach((i, k) => {
+      const d = Math.hypot(pts[k].x - impact.x, pts[k].y - impact.y) / u * 0.035;
+      maxDelay = Math.max(maxDelay, d);
+      cells[i].style.setProperty('--d', `${d.toFixed(3)}s`);
+    });
+    flash(ev.cleared, 'pop', 500 + maxDelay * 1000);
+    const lines = [
+      ...ev.rows.map((row) => { const a = cellXY(row * N), b = cellXY(row * N + N - 1); return { cx: (a.x + b.x) / 2, cy: a.y, horiz: true, len: b.x - a.x + u }; }),
+      ...ev.cols.map((col) => { const a = cellXY(col), b = cellXY((N - 1) * N + col); return { cx: a.x, cy: (a.y + b.y) / 2, horiz: false, len: b.y - a.y + u }; }),
+    ];
     const center = { x: pts.reduce((a, p) => a + p.x, 0) / pts.length, y: pts.reduce((a, p) => a + p.y, 0) / pts.length };
-    fx.explode({ cells: ev.cleared.map((i) => ({ ...cellXY(i), color: colors[i] })), lines, center, u, power: tier });
+    fx.explode({ impact, cells: ev.cleared.map((i) => ({ ...cellXY(i), color: colors[i] })), lines, center, u, power: tier });
     const b = $('board');
     b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash');
 
@@ -474,7 +491,7 @@ function doPlace(slot, r, c) {
     boom(tier);
     for (let i = 0; i < Math.min(ev.lineCount + ev.combo, 8); i++) beep(520 + i * 110 + tier * 60, 0.12, 0.05 + i * 0.06);
     shakeBoard(tier);
-    if (tier >= 3) navigator.vibrate?.(tier >= 4 ? [40, 30, 80, 30, 120] : [30, 30, 60]);
+    buzz(BUZZ[`clear${tier}`]);
     setFever(ev.combo);
 
     // 보드를 완전히 비웠다: 퍼펙트
@@ -485,7 +502,7 @@ function doPlace(slot, r, c) {
         fx.perfect(center, u);
         boom(3); [659, 784, 988, 1319, 1568].forEach((f, i) => beep(f, 0.2, i * 0.09, 0.09));
         shakeBoard(4);
-        navigator.vibrate?.([60, 40, 120]);
+        buzz(BUZZ.perfect);
       }, 650);
     }
   } else {
@@ -505,7 +522,7 @@ function doPlace(slot, r, c) {
       const c = cellXY(Math.floor(N * N / 2) + N / 2);
       fx.levelUp({ x: c.x - c.u / 2, y: c.y - c.u / 2 }, c.u);
       boom(2); [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.14, i * 0.09));
-      navigator.vibrate?.(60);
+      buzz(BUZZ.levelUp);
       toast(`레벨 ${ev.levelUp}! 큰 블럭이 늘고 기본 블럭이 떨어집니다`, 2000);
     }, ev.lineCount > 0 ? 900 : 0);
   }
@@ -523,6 +540,7 @@ function doPlace(slot, r, c) {
 function useRefresh() {
   if (!G.refreshTray(state)) return;
   beep(660, 0.08); beep(990, 0.12, 0.08);
+  buzz(BUZZ.refresh);
   persist();
   render([0, 1, 2]);
   if (state.over) setTimeout(finish, 400);
