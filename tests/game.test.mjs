@@ -39,6 +39,15 @@ test('모양(기본형)마다 고유한 색이 있고, 회전형은 같은 색�
   assert.equal(new Set(byBase.values()).size, byBase.size, '기본형끼리 색이 겹침');
 });
 
+test('테트리스 7종(ㅡ·ㅁ·ㅜ·S·Z·ㄱ·ㄴ)이 전체 뽑기 비중의 60% 이상이다', () => {
+  const tetris = new Set(['i4', 'o2', 't4', 's4', 'z4', 'l4', 'j4']);
+  const total = SHAPES.reduce((a, s) => a + s.weight, 0);
+  const share = SHAPES.filter((s) => tetris.has(s.name.replace(/_\d+$/, ''))).reduce((a, s) => a + s.weight, 0) / total;
+  assert.ok(share >= 0.6, `테트리스 비중 ${(share * 100).toFixed(0)}%`);
+  // ㄱ·ㄴ(L·J)은 네 방향 모두 나온다
+  for (const b of ['l4', 'j4', 't4']) assert.equal(SHAPES.filter((s) => s.name.startsWith(b + '_')).length, 4);
+});
+
 test('새 판: 기본 블럭이 깔리고, 완성된 줄이 없고, 놓을 수 있다', () => {
   for (let seed = 0; seed < 200; seed++) {
     const s = G.newGame({ seed });
