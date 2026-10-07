@@ -1,11 +1,11 @@
 // 기기 저장소. 버전 번호를 두고 구조가 바뀌면 단계별로 이전한다.
 // 규칙: 저장 키를 바꾸거나 통째로 지우지 않는다. 새 필드는 migrate()에서 채운다.
 const KEY = 'blockfill.save';
-export const SCHEMA = 5;
+export const SCHEMA = 6;
 
 const defaults = () => ({
   schema: SCHEMA,
-  settings: { mute: false, sound: 'all', helpShown: false }, // sound: 'all'(효과음+음악) | 'sfx' | 'off'. mute는 옛 필드
+  settings: { mute: false, sound: 'all', helpShown: false, lastLoginId: '' }, // sound: 'all'|'sfx'|'off'. lastLoginId: 마지막 로그인 아이디(다음 로그인 때 미리 채움)
   local: { best: 0, games: 0, streak: 0, lastPlay: null,
     history: [],        // 최근 판 기록 [{ score, date, mode, lines, combo, moves, refresh }] 최신순
     achievements: {} }, // { 업적id: 달성 날짜 }
@@ -42,6 +42,10 @@ export function migrate(data) {
   if (data.schema < 5) { // v2.7: 소리 설정 3단계 (옛 mute 값을 이어받는다)
     data.settings.sound = data.settings.mute ? 'off' : 'all'; // (기본값 병합이 먼저 일어나므로 ??= 로는 안 된다)
     data.schema = 5;
+  }
+  if (data.schema < 6) { // v2.9: 마지막 로그인 아이디 기억
+    data.settings.lastLoginId ||= '';
+    data.schema = 6;
   }
   data.schema = SCHEMA;
   return data;

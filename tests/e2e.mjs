@@ -50,7 +50,9 @@ const ui = (page) => page.evaluate(() => ({
 // 놓을 수 있는 자리 하나를 고른다 (줄이 지워지는 자리를 우선). 화면 좌표까지 계산해 돌려준다.
 // 줄이 지워진 직후에는 보드가 흔들려 칸 위치가 움직이므로, 흔들림이 끝난 뒤 좌표를 잰다.
 async function pickTarget(page, touch) {
-  await page.waitForTimeout((await page.evaluate(() => document.getElementById('boardWrap').classList.contains('shake') && globalThis.__blockfill.state.combo > 0)) ? 700 : 0);
+  // 직전 수에서 줄이 지워졌으면(흔들림·연쇄 폭발·레벨업 연출 중) 연출이 끝날 때까지 기다린다
+  const busy = await page.evaluate(() => globalThis.__blockfill.state.combo > 0 || !!document.querySelector('.cell.pop, .cell.ignite') || document.getElementById('comboText').classList.contains('show'));
+  if (busy) await page.waitForTimeout(1100);
   return page.evaluate(async (touch) => {
     const G = await import('./js/game.js');
     const { SHAPES } = await import('./js/shapes.js');
@@ -287,6 +289,10 @@ console.log('\n[5] 온라인 미연결 안내·설정');
   await page.fill('#startId', 'ab'); await page.fill('#startNick', '테스터'); await page.fill('#startPw', '123456');
   await page.click('#startSubmit'); await page.waitForTimeout(200);
   check('아이디가 짧으면 서버에 보내지 않고 안내한다', /3~16자/.test(await page.evaluate(() => document.getElementById('startError').textContent)));
+  // 마지막 로그인 아이디 기억: 저장된 값이 있으면 아이디 칸에 미리 채워진다
+  await page.evaluate(() => { const d = JSON.parse(localStorage.getItem('blockfill.save')); d.settings.lastLoginId = 'kevin98'; localStorage.setItem('blockfill.save', JSON.stringify(d)); });
+  await page.reload(); await page.waitForSelector('#startForm:not([hidden])', { timeout: 8000 }); await page.waitForTimeout(150);
+  check('마지막 로그인 아이디가 미리 채워지고 커서는 암호 칸에 있다', await page.evaluate(() => document.getElementById('startId').value === 'kevin98' && document.activeElement?.id === 'startPw'));
   await page.click('#startGuest');
   await page.waitForFunction(() => document.getElementById('start').hidden, null, { timeout: 3000 });
   await page.click('#btnMute'); await page.click('#btnMute'); // 전체 → 효과음만 → 끄기

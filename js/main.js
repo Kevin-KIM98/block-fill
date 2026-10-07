@@ -727,6 +727,7 @@ function openAuth() {
   $('authError').textContent = '';
   setSignupMode(false);
   $('dlgAuth').showModal();
+  prefillLogin($('authId'), $('authPw'));
 }
 
 function setSignupMode(on) {
@@ -770,6 +771,7 @@ async function doAuth({ id, pw, nick, signup, err, btn }) {
   btn.disabled = true;
   try {
     if (signup) await O.signUp(id, nick, pw); else await O.signIn(id, pw);
+    data.settings.lastLoginId = id; S.save(); // 다음 로그인 때 아이디를 미리 채운다
     toast(`${O.profile.nickname} 님, 환영합니다!`);
     sfx('login');
     await onLoggedIn();
@@ -809,6 +811,15 @@ function showStart(status = '') {
   $('startGuest').hidden = false;
   $('startGuest').textContent = O.enabled() ? '게스트로 둘러보기 (기록은 이 기기에만 저장)' : '게임 시작';
   setStartMode(false);
+  prefillLogin($('startId'), $('startPw'));
+}
+
+// 마지막으로 로그인한 아이디를 채우고, 채워졌으면 커서를 암호 칸으로 보낸다
+function prefillLogin(idEl, pwEl) {
+  const last = data.settings.lastLoginId || '';
+  if (!last || idEl.value) return;
+  idEl.value = last;
+  setTimeout(() => { try { pwEl.focus({ preventScroll: true }); } catch { /* 무시 */ } }, 50);
 }
 let entered = false;
 function enterGame() {
