@@ -215,22 +215,38 @@ export function place(state, slot, r, c) {
   for (const col of cols) for (let i = 0; i < CFG.size; i++) { const k = idx(i, col); if (!cleared.has(k)) { cleared.add(k); lineCells.push(k); } }
   if (lineCells.length) waves.push({ cells: lineCells, rows: rows.slice(), cols: cols.slice(), bomb: null });
   const exploded = [], revealed = [];
+  const isBomb = (k) => state.bombs.includes(k) || state.hidden.includes(k);
   let bombLines = 0;
   for (let w = 0; w < waves.length; w++) {
     for (const k of waves[w].cells) {
-      const isHidden = state.hidden.includes(k);
-      if ((!state.bombs.includes(k) && !isHidden) || exploded.includes(k)) continue;
-      exploded.push(k);
-      if (isHidden) revealed.push(k);
-      const br = Math.floor(k / CFG.size), bc = k % CFG.size;
-      const cellsW = [];
-      for (let i = 0; i < CFG.size; i++) {
-        for (const q of [idx(br, i), idx(i, bc)]) {
-          if (!cleared.has(q) && state.board[q]) { cleared.add(q); cellsW.push(q); }
+      if (!isBomb(k) || exploded.includes(k)) continue;
+      // 붙어 있는 폭탄(8방향)을 한 덩어리로 모은다. 덩어리가 클수록 세게 터진다.
+      const cluster = [k];
+      for (let q = 0; q < cluster.length; q++) {
+        const cr = Math.floor(cluster[q] / CFG.size), cc = cluster[q] % CFG.size;
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+          const nr = cr + dr, nc = cc + dc;
+          if (nr < 0 || nc < 0 || nr >= CFG.size || nc >= CFG.size) continue;
+          const nk = idx(nr, nc);
+          if (isBomb(nk) && !exploded.includes(nk) && !cluster.includes(nk)) cluster.push(nk);
         }
       }
-      bombLines += 2;
-      waves.push({ cells: cellsW, rows: [br], cols: [bc], bomb: k, hidden: isHidden });
+      const n = cluster.length, radius = Math.min(CFG.bomb.maxRadius, n - 1);
+      const cellsW = [], rows = [], cols = [];
+      const take = (q) => { if (!cleared.has(q) && state.board[q]) { cleared.add(q); cellsW.push(q); } };
+      for (const b of cluster) {
+        exploded.push(b);
+        if (state.hidden.includes(b)) revealed.push(b);
+        const br = Math.floor(b / CFG.size), bc = b % CFG.size;
+        rows.push(br); cols.push(bc);
+        for (let i = 0; i < CFG.size; i++) { take(idx(br, i)); take(idx(i, bc)); }
+        for (let dr = -radius; dr <= radius; dr++) for (let dc = -radius; dc <= radius; dc++) {
+          const nr = br + dr, nc = bc + dc;
+          if (nr >= 0 && nc >= 0 && nr < CFG.size && nc < CFG.size) take(idx(nr, nc));
+        }
+      }
+      bombLines += 2 * n + (n - 1);
+      waves.push({ cells: cellsW, rows, cols, bomb: k, bombs: cluster, power: n, radius, hidden: cluster.some((b) => state.hidden.includes(b)) });
     }
   }
   for (const i of cleared) state.board[i] = 0;

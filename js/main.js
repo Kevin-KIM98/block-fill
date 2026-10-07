@@ -431,11 +431,14 @@ function screenBlast(at, chainNo) {
   el.style.setProperty('--bc', CHAIN_COLORS[Math.min(CHAIN_COLORS.length - 1, chainNo)]);
   el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
 }
-function chainText(chainNo, hidden) {
+function chainText(chainNo, hidden, power = 1) {
   const el = $('chainText');
-  el.textContent = hidden ? `💣 숨은 폭탄! CHAIN ×${chainNo}` : chainNo >= 3 ? `💥 MEGA CHAIN ×${chainNo}` : `💥 CHAIN ×${chainNo}`;
-  el.style.fontSize = `${Math.min(52, 30 + chainNo * 5)}px`;
-  el.style.textShadow = `0 0 10px ${CHAIN_COLORS[Math.min(4, chainNo)]}, 0 0 30px ${CHAIN_COLORS[Math.min(4, chainNo)]}, 0 3px 0 rgba(0,0,0,.6)`;
+  const big = power >= 2 ? `💣×${power} ${power >= 4 ? 'NUCLEAR' : power >= 3 ? 'MEGA BLAST' : 'DOUBLE BLAST'}` : '';
+  const chain = hidden ? `💣 숨은 폭탄! CHAIN ×${chainNo}` : chainNo >= 3 ? `💥 MEGA CHAIN ×${chainNo}` : `💥 CHAIN ×${chainNo}`;
+  el.textContent = big ? `${big} · ${chain}` : chain;
+  const lv = chainNo + power - 1;
+  el.style.fontSize = `${Math.min(56, 28 + lv * 5)}px`;
+  el.style.textShadow = `0 0 10px ${CHAIN_COLORS[Math.min(4, lv)]}, 0 0 30px ${CHAIN_COLORS[Math.min(4, lv)]}, 0 3px 0 rgba(0,0,0,.6)`;
   el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
 }
 
@@ -507,23 +510,28 @@ function doPlace(slot, r, c) {
     const chainWaves = ev.waves.filter((w) => w.bomb != null);
     ev.waves.forEach((w, wi) => {
       if (w.bomb == null) return;
-      const b = cellXY(w.bomb);
+      const group = w.bombs || [w.bomb];
+      const gp = group.map(cellXY);
+      const b = { x: gp.reduce((a, q) => a + q.x, 0) / gp.length, y: gp.reduce((a, q) => a + q.y, 0) / gp.length }; // 덩어리 중심
       const chainNo = chainWaves.indexOf(w) + 1;
-      // 폭탄 칸은 자기 파동 시각까지 남아 하얗게 맥동한다 (점화 예고)
-      cells[w.bomb].style.setProperty('--d', `${(wi * WAVE).toFixed(3)}s`);
-      cells[w.bomb].classList.add('ignite');
-      setTimeout(() => cells[w.bomb].classList.remove('ignite'), wi * WAVE * 1000 + 600);
-      const bl = [
-        { cx: cellXY(w.rows[0] * N + N / 2).x, cy: b.y, horiz: true, len: u * N },
-        { cx: b.x, cy: cellXY(Math.floor(N / 2) * N + w.cols[0]).y, horiz: false, len: u * N },
-      ];
+      const power = w.power || 1;
+      // 덩어리의 폭탄 칸들은 자기 파동 시각까지 남아 하얗게 맥동한다 (점화 예고)
+      for (const bi of group) {
+        cells[bi].style.setProperty('--d', `${(wi * WAVE).toFixed(3)}s`);
+        cells[bi].classList.add('ignite');
+        setTimeout(() => cells[bi].classList.remove('ignite'), wi * WAVE * 1000 + 600);
+      }
+      const bl = group.flatMap((bi) => {
+        const q = cellXY(bi);
+        return [{ cx: cellXY(Math.floor(bi / N) * N + N / 2).x, cy: q.y, horiz: true, len: u * N }, { cx: q.x, cy: cellXY(Math.floor(N / 2) * N + bi % N).y, horiz: false, len: u * N }];
+      });
       setTimeout(() => {
-        fx.bombBlast({ x: b.x, y: b.y }, u, bl, w.cells.map((i) => ({ ...cellXY(i), color: colors[i] })), chainNo - 1, w.hidden);
-        screenBlast(b, chainNo);
-        chainText(chainNo, w.hidden);
+        fx.bombBlast(b, u, bl, w.cells.map((i) => ({ ...cellXY(i), color: colors[i] })), chainNo - 1, w.hidden, power, w.radius || 0);
+        screenBlast(b, chainNo + power - 1);
+        chainText(chainNo, w.hidden, power);
         boom(3 + Math.min(2, chainNo), 0); [660, 880, 1100, 1320][Math.min(3, chainNo)] && beep([660, 880, 1100, 1320][Math.min(3, chainNo)], 0.2, 0, 0.09);
-        buzz(chainNo >= 2 ? BUZZ.clear4 : BUZZ.clear3);
-        shakeBoard(Math.min(4, 2 + chainNo));
+        buzz(chainNo >= 2 || power >= 2 ? BUZZ.clear4 : BUZZ.clear3);
+        shakeBoard(Math.min(4, 2 + chainNo + (power >= 2 ? 1 : 0)));
         const bd = $('board'); bd.classList.remove('punch'); void bd.offsetWidth; bd.classList.add('punch');
       }, wi * WAVE * 1000);
     });
@@ -541,7 +549,8 @@ function doPlace(slot, r, c) {
     const notes = [];
     if (ev.lineCount > 1) notes.push(['더블', '트리플', '쿼드러플'][Math.min(ev.lineCount, 4) - 2] + ` ${ev.lineCount}줄`);
     if (ev.combo > 1) notes.push(`${ev.combo} 콤보`);
-    if (ev.bombs.length) notes.unshift(ev.bombs.length >= 2 ? `💣 연쇄 폭발 ×${ev.bombs.length}` : '💣 폭발');
+    const maxPower = Math.max(0, ...ev.waves.map((w) => w.power || 0));
+    if (ev.bombs.length) notes.unshift(maxPower >= 2 ? `💣×${maxPower} 중첩 폭발` : ev.bombs.length >= 2 ? `💣 연쇄 폭발 ×${ev.bombs.length}` : '💣 폭발');
     const word = tier >= 2 ? COMBO_WORDS[tier][(ev.combo + ev.lineCount) % 3] + ' ' : '';
     const el = $('comboText');
     el.classList.remove('t2', 't3', 't4', 'huge');

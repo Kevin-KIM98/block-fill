@@ -257,6 +257,38 @@ test('십자에 걸린 폭탄은 연쇄로 터지고, 안 걸린 폭탄은 남�
 });
 
 
+test('붙어 있는 폭탄은 한 덩어리로 같이 터지고, 덩어리 크기만큼 반경과 줄 수가 커진다', () => {
+  // (0,0)에 폭탄 블럭을 놓아 0행 완성 → (0,0)·(1,1)·(2,2)가 대각선으로 붙은 덩어리(3개) → 한 파동, 반경 2
+  const s = empty({ trayBombs: [0, null, null], bombs: [1 * N + 1, 2 * N + 2] });
+  for (let c = 1; c < N; c++) s.board[c] = 1;
+  s.board[1 * N + 1] = 2; s.board[2 * N + 2] = 2;
+  s.board[4 * N + 4] = 5; // 반경 2 안 (2,2)+(2,2) → 날아간다
+  s.board[5 * N + 5] = 5; // 반경 밖, 십자 밖 → 남는다
+  s.board[7 * N + 7] = 5;
+  s.tray[0] = shapeByName('dot_0');
+  const ev = G.place(s, 0, 0, 0);
+  assert.equal(ev.waves.length, 2);
+  const w = ev.waves[1];
+  assert.equal(w.power, 3);
+  assert.equal(w.radius, 2);
+  assert.deepEqual([...w.bombs].sort((a, b) => a - b), [0, N + 1, 2 * N + 2]);
+  assert.deepEqual([...ev.bombs].sort((a, b) => a - b), [0, N + 1, 2 * N + 2]);
+  assert.equal(ev.lineCount, 1 + 2 * 3 + 2);
+  assert.equal(s.board[4 * N + 4], 0);
+  assert.equal(s.board[5 * N + 5], 5);
+  assert.equal(s.board[7 * N + 7], 5);
+  assert.deepEqual(s.bombs, []);
+  // 떨어져 있는 폭탄 2개는 따로(연쇄) 터지고 위력은 각각 1
+  const t = empty({ trayBombs: [0, null, null], bombs: [3 * N] });
+  for (let c = 1; c < N; c++) t.board[c] = 1;
+  for (let r = 1; r < N - 1; r++) t.board[r * N] = 2;
+  t.tray[0] = shapeByName('dot_0');
+  const ev2 = G.place(t, 0, 0, 0);
+  assert.equal(ev2.waves.length, 3);
+  assert.ok(ev2.waves.slice(1).every((x) => x.power === 1 && x.radius === 0));
+  assert.equal(ev2.lineCount, 1 + 2 + 2);
+});
+
 test('숨겨진 폭탄: 시작 기본 블럭에 숨어 있다가 그 줄이 지워지면 십자로 터진다', () => {
   const g = G.newGame({ seed: 3 });
   assert.equal(g.hidden.length, CFG.bomb.hiddenInPrefill);

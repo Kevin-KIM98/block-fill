@@ -1,6 +1,6 @@
 // 게임 설정값. 밸런스 조정은 이 파일에서만 한다.
 // 배포할 때 version.json의 값도 같이 올린다 (앱이 새 버전을 알아채는 기준).
-export const APP_VERSION = '2.3.0';
+export const APP_VERSION = '2.4.0';
 
 export const CFG = {
   size: 8,                 // 보드 한 변의 칸 수
@@ -22,6 +22,9 @@ export const CFG = {
     linesPerBomb: 4, maxCharges: 3,
     hiddenInPrefill: 2,   // 시작 기본 블럭 중 숨겨진 폭탄 수
     hiddenInDrop: 0.35,   // 레벨업 때 떨어지는 기본 블럭 하나가 숨겨진 폭탄일 확률
+    // 붙어 있는 폭탄(8방향)은 한 덩어리로 같이 터진다. 덩어리 크기 n이면 십자 외에 반경 min(maxRadius, n-1)칸까지 날리고
+    // 줄 수는 2n + (n-1)로 계산한다.
+    maxRadius: 3,
   },
   // 레벨(난이도 곡선): 줄을 지울수록 오른다. 레벨이 오르면 기본 블럭이 떨어지고 큰 블럭이 늘고 점수 배수가 붙는다.
   level: {

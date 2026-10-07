@@ -111,9 +111,10 @@ export function createFX(canvas) {
   }
 
   // 폭탄 폭발: 폭탄 자리에서 큰 충격파 + 가로·세로 레이저 + 불기둥 + 칸 연쇄 폭발. wave가 클수록(연쇄) 더 크다
-  function bombBlast(at, u, lines, cells, wave = 0, hidden = false) {
+  // power: 같이 터진 폭탄 수(덩어리 크기). 클수록 링·레이저·불기둥이 커지고 반경 영역이 불바다가 된다
+  function bombBlast(at, u, lines, cells, wave = 0, hidden = false, power = 1, radius = 0) {
     if (reduce) return;
-    const p = 2 + Math.min(3, wave);
+    const p = 2 + Math.min(3, wave) + Math.min(3, power - 1);
     const main = ['#ffb020', '#ff5d6c', '#c36bff', '#4fd1ff'][Math.min(3, wave)];
     const sub = ['#ffd23f', '#ff6a3d', '#ff6fb5', '#ffffff'][Math.min(3, wave)];
     if (hidden) { // 숨은 폭탄 공개: 하얀 섬광 + 빠른 링
@@ -121,11 +122,18 @@ export function createFX(canvas) {
       ring(at.x, at.y, '#fff', 2, u * 3, 0.3, 10);
       for (let k = 0; k < n(30); k++) spark(at.x, at.y, '#fff', 1.4, 1.6, 0, 200);
     }
-    flash(main, 0.25 + wave * 0.07, 0.35);
-    // 충격파 3겹
-    ring(at.x, at.y, '#fff', 2, u * 2.5, 0.4, 9);
-    ring(at.x, at.y, main, u * 0.5, u * (9 + wave * 2), 0.8, 12 + wave * 3, 0.06);
-    ring(at.x, at.y, sub, u * 0.3, u * 6, 0.6, 6, 0.14);
+    flash(main, Math.min(0.6, 0.25 + wave * 0.07 + (power - 1) * 0.1), 0.35 + power * 0.05);
+    // 충격파 3겹 (위력만큼 두껍고 넓게)
+    ring(at.x, at.y, '#fff', 2, u * (2.5 + power), 0.4 + power * 0.05, 9 + power * 3);
+    ring(at.x, at.y, main, u * 0.5, u * (9 + wave * 2 + power * 2), 0.8 + power * 0.1, 12 + wave * 3 + power * 4, 0.06);
+    ring(at.x, at.y, sub, u * 0.3, u * (6 + power), 0.6, 6 + power * 2, 0.14);
+    // 반경 영역: 불바다 + 땅울림 링
+    if (radius > 0) {
+      const R = (radius + 0.5) * u;
+      ring(at.x, at.y, '#fff', R * 0.3, R * 1.4, 0.5, 14, 0.1);
+      for (let k = 0; k < n(40 * radius); k++) flame(at.x + rnd(-R, R), at.y + rnd(-R, R), 1.4 + radius * 0.3, rnd(0, 0.35));
+      for (let k = 0; k < n(30 * radius); k++) spark(at.x + rnd(-R, R), at.y + rnd(-R, R), k % 2 ? main : '#fff', 1 + radius * 0.3, 1.2, rnd(0, 0.3), 320);
+    }
     // 십자 레이저(굵게) + 레이저가 지나간 자리를 따라 불길이 번진다
     for (const l of lines) {
       const a = l.horiz ? 0 : Math.PI / 2;
@@ -152,8 +160,8 @@ export function createFX(canvas) {
       ring(c.x, c.y, c.color, 2, u * 0.9, 0.3, 3, d);
     }
     // 파동이 거듭될수록 폭죽이 늘고, 3차부터는 레이저 방사까지
-    for (let k = 0; k < 1 + wave; k++) rocket(at.x + rnd(-u * 2, u * 2), at.y, k % 2 ? main : sub, 1.2 + wave * 0.15, 0.15 + k * 0.12);
-    if (wave >= 2) for (let k = 0; k < 12; k++) laser(at.x, at.y, (k / 12) * TAU + 0.26, u * 6, k % 2 ? sub : '#fff', 0.12 + k * 0.015, 5);
+    for (let k = 0; k < 1 + wave + (power - 1); k++) rocket(at.x + rnd(-u * 2, u * 2), at.y, k % 2 ? main : sub, 1.2 + wave * 0.15 + power * 0.1, 0.15 + k * 0.12);
+    if (wave >= 2 || power >= 2) for (let k = 0; k < 12 + power * 4; k++) laser(at.x, at.y, (k / (12 + power * 4)) * TAU + 0.26, u * (6 + power), k % 2 ? sub : '#fff', 0.12 + k * 0.015, 5 + power);
   }
 
   // 블럭이 보드에 닿을 때: 작은 충격파 + 먼지

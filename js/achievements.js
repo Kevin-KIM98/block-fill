@@ -13,6 +13,8 @@ export const ACHIEVEMENTS = [
   { id: 'bomb1', title: '폭파 전문가', desc: '폭탄을 처음 터뜨렸다', check: ({ ev }) => ev?.bombs?.length >= 1 },
   { id: 'chain2', title: '연쇄 폭발', desc: '폭탄 2개가 연쇄로 터졌다', check: ({ ev }) => ev?.bombs?.length >= 2 },
   { id: 'chain3', title: '대폭발', desc: '폭탄 3개가 연쇄로 터졌다', check: ({ ev }) => ev?.bombs?.length >= 3 },
+  { id: 'cluster2', title: '중첩 폭발', desc: '붙어 있는 폭탄 2개를 한꺼번에 터뜨렸다', check: ({ ev }) => ev?.waves?.some((w) => w.power >= 2) },
+  { id: 'cluster3', title: '핵폭발', desc: '붙어 있는 폭탄 3개를 한꺼번에 터뜨렸다', check: ({ ev }) => ev?.waves?.some((w) => w.power >= 3) },
   { id: 'level5', title: '레벨 5', desc: '한 판에 레벨 5에 올랐다', check: ({ state }) => (state.level ?? 1) >= 5 },
   { id: 'level10', title: '레벨 10', desc: '한 판에 레벨 10에 올랐다', check: ({ state }) => (state.level ?? 1) >= 10 },
   { id: 'lines20', title: '정리왕', desc: '한 판에 줄 20개를 지웠다', check: ({ state }) => state.lines >= 20 },
