@@ -163,7 +163,7 @@ async function loadRivals() {
 // 전체 1위를 보드 위에 보여 준다 (로그인 상태일 때)
 async function loadChampion() {
   const el = $('champ');
-  if (!O.enabled() || !O.profile) { el.hidden = true; return; }
+  if (!O.enabled() || !O.profile) { el.hidden = false; el.classList.remove('me'); el.textContent = O.enabled() ? '👑 로그인하면 전체 1위가 표시됩니다' : ''; return; }
   try {
     const rows = await O.leaderboard('global', 'all', 1);
     el.hidden = false;
@@ -374,6 +374,38 @@ function fxLayout() {
   const w = $('boardWrap').getBoundingClientRect();
   fx.resize(w.width + FX_PAD * 2, w.height + FX_PAD * 2);
 }
+
+// ---------- 화면 맞춤 ----------
+// 보드 칸 크기를 '앱 영역에 남는 높이'로 계산해 px로 고정한다. vh 단위를 쓰면 모바일 주소창이 보였다 숨겨질 때
+// 보드가 커졌다 작아지므로, 주소창이 보일 때 높이(svh)로 고정된 #app 안에서 한 번 계산하고 그 값을 유지한다.
+let lastFit = '';
+function fitLayout() {
+  const app = $('app');
+  const cs = getComputedStyle(app);
+  const innerW = app.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const innerH = app.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  // 칸 크기와 무관한 고정 요소들의 높이
+  const fixed = ['header', '.stats', '#rival', '.actions', 'footer'].reduce((a, sel) => a + (document.querySelector(sel)?.offsetHeight || 0), 0);
+  const stuck = $('stuck').hidden ? 0 : $('stuck').offsetHeight;
+  const gaps = parseFloat(cs.rowGap || cs.gap || 10) * (stuck ? 7 : 6);
+  const avail = innerH - fixed - stuck - gaps - 8; // 8: 보드 안쪽 여백
+  // 보드 8칸 + 트레이 2.7칸이 세로로 들어가야 한다
+  const byH = avail / 10.7;
+  const byW = (innerW - 8) / 8;
+  let cell = Math.floor(Math.min(byW, byH, 55));
+  app.classList.toggle('scroll', cell < 30);
+  cell = Math.max(30, cell);
+  const key = `${cell}:${innerW}:${innerH}`;
+  if (key === lastFit) return;
+  lastFit = key;
+  document.documentElement.style.setProperty('--cell', `${cell}px`);
+  fxLayout();
+}
+fitLayout();
+addEventListener('orientationchange', () => setTimeout(fitLayout, 150));
+// 1위 줄·막힘 안내 등 높이가 바뀌는 요소가 생기면 다시 맞춘다 (앱 영역 자체는 주소창에 영향받지 않는다)
+new ResizeObserver(() => fitLayout()).observe($('app'));
+for (const sel of ['#rival', '#stuck', 'header']) new ResizeObserver(() => fitLayout()).observe(document.querySelector(sel));
 // 칸 번호 → 캔버스 좌표(중심)
 function cellXY(i) {
   const wr = $('boardWrap').getBoundingClientRect();
@@ -384,7 +416,7 @@ function boardBox() {
   const wr = $('boardWrap').getBoundingClientRect(), b = $('board').getBoundingClientRect();
   return { x: b.left - wr.left + FX_PAD, y: b.top - wr.top + FX_PAD, w: b.width, h: b.height };
 }
-addEventListener('resize', fxLayout);
+addEventListener('resize', () => { fitLayout(); fxLayout(); });
 fxLayout();
 
 // 점수가 보드에서 점수판으로 날아간다
@@ -808,7 +840,7 @@ $('btnUser').addEventListener('click', () => {
 
 $('btnLogout').addEventListener('click', async () => {
   await O.signOut();
-  $('champ').hidden = true;
+  loadChampion();
   $('dlgUser').close();
   refreshUser();
   render();
@@ -1136,6 +1168,7 @@ checkUpdate();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
 refreshUser();
 startGame('classic');
+loadChampion();
 // 시작 화면을 먼저 띄우고, 이미 로그인된 기기면 바로 게임으로 들어간다
 $('start').hidden = false;
 $('startForm').hidden = true;

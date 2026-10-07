@@ -2,7 +2,7 @@
   --bg: #12131c; --panel: #1c1e2b; --panel2: #262939; --line: #32364a;
   --text: #eef0f8; --muted: #8b90a8; --accent: #ffb020; --accent2: #4fd1ff; --danger: #ff5d6c;
   /* 보드 한 칸. 세로가 짧은 화면에서는 높이에 맞춰 줄여 트레이·버튼까지 한 화면에 들어가게 한다 */
-  --cell: calc(min(92vw, 440px, 44vh) / 8);
+  --cell: 44px; /* 실제 값은 main.js의 fitLayout()이 화면 크기에 맞춰 px로 정한다 (vh를 쓰면 모바일 주소창 때문에 보드가 커졌다 작아진다) */
   /* 블럭 색: 기본형마다 하나씩(js/shapes.js가 순서대로 번호를 매김). 8번은 기본 블럭 */
   --c1: hsl(0 88% 64%); --c2: hsl(105 88% 52%); --c3: hsl(210 88% 64%); --c4: hsl(315 88% 52%);
   --c5: hsl(60 88% 64%); --c6: hsl(165 88% 52%); --c7: hsl(270 88% 64%); --c9: hsl(15 88% 52%);
@@ -17,12 +17,15 @@
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
   font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   overscroll-behavior: none; user-select: none; -webkit-user-select: none; }
+/* 모바일: 페이지가 스크롤·바운스되지 않게 고정한다. 높이는 주소창이 보일 때 기준(svh)이라 주소창이 숨어도 배치가 움직이지 않는다 */
+body { position: fixed; inset: 0; overflow: hidden; width: 100%; height: 100vh; height: 100svh; }
 button { font: inherit; color: inherit; border: 0; cursor: pointer; background: none; }
 button:disabled { cursor: not-allowed; }
 input { font: inherit; }
 
-#app { max-width: 480px; min-height: 100%; margin: 0 auto; padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
-  display: flex; flex-direction: column; align-items: center; gap: 10px; }
+#app { max-width: 480px; height: 100%; margin: 0 auto; padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; align-items: center; gap: 10px; overflow: hidden; touch-action: manipulation; box-sizing: border-box; }
+#app.scroll { overflow-y: auto; } /* 아주 작은 화면: 칸을 더 줄일 수 없으면 스크롤 허용 */
 header { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 h1 { margin: 0; font-size: 20px; letter-spacing: 1px; font-weight: 900; }
 h1 span { color: var(--accent); }
@@ -54,7 +57,7 @@ nav { display: flex; gap: 6px; flex-wrap: wrap; }
 .stat .bar i { display: block; height: 100%; width: 0; background: var(--accent2); transition: width .3s; }
 @keyframes bump { 50% { transform: scale(1.25); } }
 
-#rival { width: 100%; min-height: 30px; font-size: 13px; color: var(--muted); text-align: center;
+#rival { width: 100%; min-height: 46px; font-size: 13px; justify-content: center; color: var(--muted); text-align: center;
   background: var(--panel); border-radius: 10px; padding: 6px 10px; }
 #rival { display: flex; flex-direction: column; gap: 2px; }
 #rival b { color: var(--accent2); }
@@ -62,7 +65,7 @@ nav { display: flex; gap: 6px; flex-wrap: wrap; }
 #champ[hidden] { display: none; }
 #champ b { color: #fff; }
 #champ.me { color: var(--accent); }
-@media (max-height: 700px) { #rival { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 2px 10px; font-size: 12px; } }
+@media (max-height: 700px) { #rival { min-height: 30px; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 2px 10px; font-size: 12px; } }
 #rival.passed { color: var(--accent); animation: bump .4s; }
 
 #boardWrap { position: relative; }
@@ -239,7 +242,7 @@ footer { width: 100%; display: flex; justify-content: space-between; color: var(
   padding: 8px 16px; border-radius: 999px; font-size: 14px; font-weight: 700; z-index: 50; transition: transform .25s; max-width: 90vw; text-align: center; }
 #toast.show { transform: translate(-50%, 0); }
 
-dialog { border: 0; padding: 0; background: transparent; color: var(--text); width: min(92vw, 400px); max-height: 88vh; }
+dialog { border: 0; padding: 0; background: transparent; color: var(--text); width: min(92vw, 400px); max-height: 88vh; max-height: 88svh; }
 dialog::backdrop { background: rgba(5,6,12,.75); }
 .sheet { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
 .sheet.center { text-align: center; }
