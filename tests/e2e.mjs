@@ -27,6 +27,12 @@ async function newPage(opts = {}) {
   page.on('response', (r) => { if (r.status() >= 400) page.logs.push(`http ${r.status()}: ${r.url()}`); });
   return page;
 }
+// 시작 화면(로그인)을 게스트로 지나 게임으로 들어간다
+async function enter(page) {
+  await page.waitForSelector('#tray .slot .piece');
+  await page.click('#startGuest', { timeout: 8000 });
+  await page.waitForFunction(() => document.getElementById('start').hidden, null, { timeout: 3000 });
+}
 const ui = (page) => page.evaluate(() => ({
   score: Number(document.getElementById('score').textContent.replace(/\D/g, '')),
   points: Number(document.getElementById('points').textContent.replace(/\D/g, '')),
@@ -94,9 +100,9 @@ console.log('\n[1] 한 판 끝까지 플레이 (마우스 드래그)');
 {
   const page = await newPage();
   await page.goto(URL_);
-  await page.waitForSelector('#tray .slot .piece');
-  await page.waitForTimeout(600);
-  check('첫 실행: 게임 방법 안내가 뜬다', await page.evaluate(() => document.getElementById('dlgHelp').open));
+  await enter(page);
+  await page.waitForTimeout(700);
+  check('시작 화면을 지난 뒤 첫 실행 안내가 뜬다', await page.evaluate(() => document.getElementById('dlgHelp').open));
   await page.click('#dlgHelp [data-close]');
   const v0 = await ui(page);
   check('버전이 제목 옆에 표시된다', /^v\d+\.\d+\.\d+$/.test(v0.version), v0.version);
@@ -169,7 +175,7 @@ console.log('\n[1] 한 판 끝까지 플레이 (마우스 드래그)');
   const again = await ui(page);
   check('다시 도전: 새 판이 시작되고 최고 기록이 남는다', again.st.moves === 0 && again.best === end.score && !again.over, `best ${again.best}`);
   // 새로고침 후 최고 기록·기록 유지
-  await page.reload(); await page.waitForSelector('#tray .slot .piece');
+  await page.reload(); await enter(page);
   const re = await ui(page);
   check('새로고침 후 최고 기록이 유지된다', re.best === end.score);
   const warn = page.logs.filter((l) => !/favicon/.test(l));
@@ -182,7 +188,7 @@ console.log('\n[2] 터치 드래그 (휴대폰 손가락 위로 띄우기 보정
 {
   const page = await newPage({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
   await page.goto(URL_);
-  await page.waitForSelector('#tray .slot .piece');
+  await enter(page);
   await page.waitForTimeout(600);
   await page.evaluate(() => document.getElementById('dlgHelp').close());
   const cdp = await page.context().newCDPSession(page);
@@ -208,7 +214,7 @@ console.log('\n[3] 작은 화면 배치');
 for (const [w, h] of [[375, 667], [360, 640]]) {
   const page = await newPage({ viewport: { width: w, height: h } });
   await page.goto(URL_);
-  await page.waitForSelector('#tray .slot .piece');
+  await enter(page);
   const l = await page.evaluate(() => ({ tray: Math.round(document.getElementById('tray').getBoundingClientRect().bottom), btn: Math.round(document.getElementById('btnTray').getBoundingClientRect().bottom), vh: innerHeight, scrollH: document.documentElement.scrollHeight }));
   check(`${w}x${h}: 리프레시 버튼이 화면 안에 있다`, l.btn <= l.vh, JSON.stringify(l));
   check(`${w}x${h}: 블럭 3개가 화면 안에 있다`, l.tray <= l.vh, `tray ${l.tray} / vh ${l.vh}`);
@@ -223,7 +229,7 @@ console.log('\n[4] 일일 도전');
   for (let k = 0; k < 2; k++) {
     const page = await newPage();
     await page.goto(URL_);
-    await page.waitForSelector('#tray .slot .piece');
+    await enter(page);
     await page.waitForTimeout(500);
     await page.evaluate(() => document.getElementById('dlgHelp').close());
     await page.click('#btnMode');
@@ -260,17 +266,31 @@ console.log('\n[5] 온라인 미연결 안내·설정');
 {
   const page = await newPage();
   await page.goto(URL_);
-  await page.waitForSelector('#tray .slot .piece');
+  await enter(page);
   await page.waitForTimeout(500);
   await page.evaluate(() => document.getElementById('dlgHelp').close());
   for (const id of ['btnRank', 'btnFriends', 'btnUser']) {
     await page.click(`#${id}`);
     await page.waitForTimeout(100);
-    const t = await page.evaluate(() => ({ toast: document.getElementById('toast').textContent, dialogs: [...document.querySelectorAll('dialog[open]')].length }));
-    check(`${id}: 온라인 미연결 안내만 뜨고 대화창은 안 열린다`, /연결되지 않았/.test(t.toast) && t.dialogs === 0, t.toast);
+    const open = await page.evaluate(() => [...document.querySelectorAll('dialog[open]')].map((d) => d.id));
+    check(`${id}: 게스트는 로그인 창이 열린다`, open.length === 1 && open[0] === 'dlgAuth', open.join());
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(100);
   }
-  await page.click('#btnMute');
+  // 시작 화면: 로그인·회원가입 전환, 잘못된 입력은 자리에서 막힌다
+  await page.evaluate(() => localStorage.removeItem('blockfill.e2e'));
   await page.reload(); await page.waitForSelector('#tray .slot .piece');
+  await page.waitForSelector('#startForm:not([hidden])', { timeout: 8000 });
+  check('시작 화면이 먼저 뜨고 게임은 가려져 있다', await page.evaluate(() => !document.getElementById('start').hidden));
+  await page.click('#startSwitch');
+  check('회원가입 모드로 바뀌고 닉네임 칸이 생긴다', await page.evaluate(() => document.getElementById('startTitle').textContent === '회원가입' && !document.getElementById('startNickRow').hidden));
+  await page.fill('#startId', 'ab'); await page.fill('#startNick', '테스터'); await page.fill('#startPw', '123456');
+  await page.click('#startSubmit'); await page.waitForTimeout(200);
+  check('아이디가 짧으면 서버에 보내지 않고 안내한다', /3~16자/.test(await page.evaluate(() => document.getElementById('startError').textContent)));
+  await page.click('#startGuest');
+  await page.waitForFunction(() => document.getElementById('start').hidden, null, { timeout: 3000 });
+  await page.click('#btnMute');
+  await page.reload(); await enter(page);
   check('음소거 설정이 새로고침 후 유지된다', await page.evaluate(() => document.getElementById('btnMute').classList.contains('muted')));
   await page.click('#btnRecords'); await page.waitForTimeout(100);
   await page.click('#btnHelp'); await page.waitForTimeout(100);

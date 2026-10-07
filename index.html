@@ -57,6 +57,26 @@
   <footer><span id="streak"></span><span id="versionFoot"></span></footer>
 </div>
 
+<!-- 시작 화면: 로그인·회원가입을 거쳐야 게임으로 들어간다 -->
+<section id="start" hidden>
+  <div class="start-bg"></div>
+  <div class="start-card">
+    <h1 class="logo">BLOCK<span>FILL</span></h1>
+    <p class="tag">줄을 지우고, 폭탄을 터뜨리고, 친구를 제쳐라</p>
+    <form id="startForm" class="start-form">
+      <h2 id="startTitle">로그인</h2>
+      <label>아이디<input id="startId" autocomplete="username" maxlength="16" placeholder="영문·숫자 3~16자" required></label>
+      <label id="startNickRow" hidden>닉네임<input id="startNick" maxlength="12" placeholder="랭킹에 표시될 이름"></label>
+      <label>암호<input id="startPw" type="password" autocomplete="current-password" minlength="6" placeholder="6자 이상" required></label>
+      <p class="error" id="startError"></p>
+      <button class="primary" id="startSubmit">로그인</button>
+      <button type="button" class="link" id="startSwitch">계정이 없나요? 회원가입</button>
+    </form>
+    <p class="start-status" id="startStatus">자동 로그인 확인 중…</p>
+    <button type="button" class="link small" id="startGuest" hidden>게스트로 둘러보기 (기록은 이 기기에만 저장)</button>
+  </div>
+</section>
+
 <div id="drag"></div>
 <div id="toast"></div>
 <div id="flyLayer"></div>

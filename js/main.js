@@ -729,30 +729,72 @@ async function onLoggedIn() {
   loadRivals();
 }
 
-$('authForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const id = $('authId').value.trim();
-  const pw = $('authPw').value;
-  const nick = $('authNick').value.trim();
-  const err = $('authError');
-  if (!O.validateLoginId(id)) { err.textContent = '아이디는 영문·숫자·밑줄 3~16자로 입력해 주세요.'; return; }
-  if (pw.length < 6) { err.textContent = '암호는 6자 이상이어야 합니다.'; return; }
-  if (signupMode && (nick.length < 2 || nick.length > 12)) { err.textContent = '닉네임은 2~12자로 입력해 주세요.'; return; }
+// 로그인·회원가입 공통 처리. 시작 화면과 게임 안 대화창이 같이 쓴다.
+async function doAuth({ id, pw, nick, signup, err, btn }) {
+  if (!O.validateLoginId(id)) { err.textContent = '아이디는 영문·숫자·밑줄 3~16자로 입력해 주세요.'; return false; }
+  if (pw.length < 6) { err.textContent = '암호는 6자 이상이어야 합니다.'; return false; }
+  if (signup && (nick.length < 2 || nick.length > 12)) { err.textContent = '닉네임은 2~12자로 입력해 주세요.'; return false; }
   err.textContent = '';
-  $('authSubmit').disabled = true;
+  btn.disabled = true;
   try {
-    if (signupMode) await O.signUp(id, nick, pw); else await O.signIn(id, pw);
-    $('dlgAuth').close();
-    $('authPw').value = '';
+    if (signup) await O.signUp(id, nick, pw); else await O.signIn(id, pw);
     toast(`${O.profile.nickname} 님, 환영합니다!`);
     await onLoggedIn();
+    return true;
   } catch (ex) {
     err.textContent = ex.message;
+    return false;
   } finally {
-    $('authSubmit').disabled = false;
+    btn.disabled = false;
   }
+}
+
+$('authForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const ok = await doAuth({ id: $('authId').value.trim(), pw: $('authPw').value, nick: $('authNick').value.trim(), signup: signupMode, err: $('authError'), btn: $('authSubmit') });
+  if (ok) { $('dlgAuth').close(); $('authPw').value = ''; }
 });
 $('authSwitch').addEventListener('click', () => setSignupMode(!signupMode));
+
+// ---------- 시작 화면 (로그인 후 게임) ----------
+let startSignup = false;
+function setStartMode(on) {
+  startSignup = on;
+  $('startTitle').textContent = on ? '회원가입' : '로그인';
+  $('startSubmit').textContent = on ? '가입하고 시작' : '로그인';
+  $('startSwitch').textContent = on ? '이미 계정이 있나요? 로그인' : '계정이 없나요? 회원가입';
+  $('startNickRow').hidden = !on;
+  $('startPw').autocomplete = on ? 'new-password' : 'current-password';
+  $('startError').textContent = '';
+}
+function showStart(status = '') {
+  const el = $('start');
+  el.classList.remove('hide');
+  el.hidden = false;
+  $('startForm').hidden = !O.enabled();
+  $('startStatus').textContent = status || (O.enabled() ? '' : '온라인 기능이 아직 연결되지 않았습니다. 게스트로 플레이할 수 있습니다.');
+  $('startGuest').hidden = false;
+  $('startGuest').textContent = O.enabled() ? '게스트로 둘러보기 (기록은 이 기기에만 저장)' : '게임 시작';
+  setStartMode(false);
+}
+let entered = false;
+function enterGame() {
+  const el = $('start');
+  el.classList.add('hide');
+  setTimeout(() => { el.hidden = true; }, 380);
+  if (!entered) {
+    entered = true;
+    // 처음 온 사람(끝낸 판 없음)에게 한 번만 게임 방법을 보여 준다
+    if (!data.settings.helpShown && data.local.games === 0 && state.moves === 0) setTimeout(openHelp, 450);
+  }
+}
+$('startForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const ok = await doAuth({ id: $('startId').value.trim(), pw: $('startPw').value, nick: $('startNick').value.trim(), signup: startSignup, err: $('startError'), btn: $('startSubmit') });
+  if (ok) { $('startPw').value = ''; enterGame(); }
+});
+$('startSwitch').addEventListener('click', () => setStartMode(!startSignup));
+$('startGuest').addEventListener('click', enterGame);
 
 $('btnUser').addEventListener('click', () => {
   if (!needLogin()) return;
@@ -770,6 +812,7 @@ $('btnLogout').addEventListener('click', async () => {
   render();
   loadRivals();
   toast('로그아웃했습니다');
+  showStart();
 });
 
 // ---------- 랭킹 ----------
@@ -1084,9 +1127,13 @@ checkUpdate();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
 refreshUser();
 startGame('classic');
-O.init().then((p) => { if (p) onLoggedIn(); });
-// 처음 온 사람(끝낸 판 없음)에게 한 번만 게임 방법을 보여 준다
-if (!data.settings.helpShown && data.local.games === 0 && state.moves === 0) setTimeout(openHelp, 400);
+// 시작 화면을 먼저 띄우고, 이미 로그인된 기기면 바로 게임으로 들어간다
+$('start').hidden = false;
+$('startForm').hidden = true;
+$('startStatus').textContent = '자동 로그인 확인 중…';
+O.init().then((p) => {
+  if (p) { onLoggedIn(); enterGame(); } else showStart();
+}).catch(() => showStart());
 
 // 검수용 창구 (테스트에서 현재 상태를 읽는다)
 globalThis.__blockfill = { get state() { return state; }, get mode() { return mode; } };
