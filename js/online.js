@@ -58,6 +58,20 @@ export async function signIn(loginId, password) {
   return fetchProfile();
 }
 
+// 닉네임 변경 (서버 함수 set_nickname). 성공하면 profile을 갱신한다.
+export async function setNickname(nick) {
+  if (!sb || !profile) throw new Error('로그인이 필요합니다.');
+  const { data, error } = await sb.rpc('set_nickname', { p_nick: nick });
+  if (error) {
+    const m = (error.message || '').toUpperCase();
+    if (m.includes('INVALID_NICKNAME')) throw new Error('닉네임은 2~12자로 입력해 주세요.');
+    if (m.includes('COULD NOT FIND THE FUNCTION') || m.includes('SET_NICKNAME')) throw new Error('서버에 닉네임 변경 함수가 아직 없습니다. supabase/migrations/001_set_nickname.sql을 SQL Editor에서 실행해 주세요.');
+    throw new Error(koError(error));
+  }
+  profile = { ...profile, nickname: data };
+  return profile;
+}
+
 export async function signOut() {
   await sb.auth.signOut();
   profile = null;

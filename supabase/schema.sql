@@ -95,6 +95,19 @@ begin
   where id = auth.uid();
 end $$;
 
+-- 닉네임 변경 (2~12자). migrations/001_set_nickname.sql 과 같은 내용
+create or replace function public.set_nickname(p_nick text)
+returns text language plpgsql security definer set search_path = public as $$
+declare
+  v_nick text := btrim(p_nick);
+begin
+  if auth.uid() is null then raise exception 'NOT_SIGNED_IN'; end if;
+  if char_length(v_nick) < 2 or char_length(v_nick) > 12 then raise exception 'INVALID_NICKNAME'; end if;
+  update profiles set nickname = v_nick where id = auth.uid();
+  return v_nick;
+end $$;
+grant execute on function public.set_nickname(text) to authenticated;
+
 -- 랭킹. p_scope: global | friends, p_period: all | week | daily
 create or replace function public.leaderboard(p_scope text, p_period text, p_limit integer default 100)
 returns table (rank bigint, user_id uuid, nickname text, score integer, is_me boolean)

@@ -87,5 +87,9 @@
 - 로그인 성공 시 아이디를 기기 설정(settings.lastLoginId, schema 6)에 저장. 시작 화면·게임 안 로그인 창에서 미리 채우고 커서는 암호 칸으로.
 - E2E: 터치 시나리오의 간헐 실패(연출 중 좌표 측정)를 '직전 수에서 줄이 지워졌으면 1.1초 대기'로 안정화. 66항목 통과.
 
+## 반복 15 (v2.10.0, 닉네임 변경)
+- DB 함수 set_nickname(2~12자, 본인만) 추가: migrations/001 + schema.sql. 계정 창에 변경 칸. 함수가 아직 없으면 안내 문구.
+
 ## 남은 것
+- **사용자 작업 필요**: Supabase SQL Editor에서 `supabase/migrations/001_set_nickname.sql` 실행 (닉네임 변경 켜기).
 - 사용자 기기에서 가입 → 점수 등록 → 친구 추가 → 랭킹 확인 (`design/plan.md` 6번).

@@ -102,7 +102,12 @@
     <h2 id="userNick"></h2>
     <p class="hint">내 친구 코드 <b class="code" id="userCode"></b></p>
     <p class="hint" id="userStats"></p>
-    <button class="primary" id="btnLogout">로그아웃</button>
+    <form id="nickForm" class="row">
+      <input id="nickInput" maxlength="12" placeholder="새 닉네임 (2~12자)" autocomplete="nickname">
+      <button class="primary" id="btnNick">닉네임 변경</button>
+    </form>
+    <p class="error" id="nickError"></p>
+    <button class="link" id="btnLogout">로그아웃</button>
     <button class="link" data-close>닫기</button>
   </div>
 </dialog>

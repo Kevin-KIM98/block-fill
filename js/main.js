@@ -846,7 +846,31 @@ $('btnUser').addEventListener('click', () => {
   $('userNick').textContent = p.nickname;
   $('userCode').textContent = p.friend_code;
   $('userStats').textContent = `최고 ${fmt(p.best_score)}점 · ${fmt(p.games_played)}판 · 연속 출석 ${p.streak}일`;
+  $('nickInput').value = p.nickname;
+  $('nickError').textContent = '';
   $('dlgUser').showModal();
+});
+
+$('nickForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const nick = $('nickInput').value.trim();
+  const err = $('nickError');
+  if (nick.length < 2 || nick.length > 12) { err.textContent = '닉네임은 2~12자로 입력해 주세요.'; return; }
+  if (nick === O.profile?.nickname) { err.textContent = '지금 닉네임과 같습니다.'; return; }
+  err.textContent = '';
+  $('btnNick').disabled = true;
+  try {
+    await O.setNickname(nick);
+    $('userNick').textContent = O.profile.nickname;
+    refreshUser();
+    loadChampion();
+    toast(`닉네임을 ${O.profile.nickname}(으)로 바꿨습니다`);
+    sfx('achieve');
+  } catch (ex) {
+    err.textContent = ex.message;
+  } finally {
+    $('btnNick').disabled = false;
+  }
 });
 
 $('btnLogout').addEventListener('click', async () => {
