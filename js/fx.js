@@ -202,7 +202,7 @@ export function createFX(canvas) {
   // ---------- 그리기 ----------
   function drawFlame(p, k) {
     const a = 1 - k;
-    const r = p.size * (1 - k * 0.7);
+    const r = Math.max(0.1, p.size * (1 - k * 0.7));
     const h = 55 - k * 45; // 노랑 → 빨강
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a * 0.9;
     const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
@@ -246,7 +246,8 @@ export function createFX(canvas) {
   }
 
   function frame(now) {
-    const dt = Math.min(0.05, (now - last) / 1000);
+    // rAF가 넘겨주는 시각이 kick()에서 기록한 시각보다 이를 수 있어(같은 프레임) 음수가 되지 않게 막는다
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
     last = now;
     ctx.clearRect(0, 0, W, H);
     hue = (hue + dt * 120) % 360;
@@ -295,7 +296,7 @@ export function createFX(canvas) {
           ctx.restore();
           break;
         case 'ring': {
-          const r = p.r0 + (p.r1 - p.r0) * (1 - (1 - k) ** 3);
+          const r = Math.max(0, p.r0 + (p.r1 - p.r0) * (1 - (1 - k) ** 3));
           ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a * 0.9;
           ctx.strokeStyle = p.color; ctx.lineWidth = p.width * a + 0.5;
           ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.stroke();
