@@ -2,8 +2,12 @@
   --bg: #12131c; --panel: #1c1e2b; --panel2: #262939; --line: #32364a;
   --text: #eef0f8; --muted: #8b90a8; --accent: #ffb020; --accent2: #4fd1ff; --danger: #ff5d6c;
   --cell: calc(min(92vw, 440px, 50vh) / 8);
-  --c1: #ff5d6c; --c2: #ff9a3d; --c3: #ffd23f; --c4: #4cd97b;
-  --c5: #4fd1ff; --c6: #6c7bff; --c7: #c36bff; --c8: #5a5f78;
+  /* 블럭 색: 모양마다 하나씩(js/shapes.js의 color). 8번은 기본 블럭 */
+  --c1: hsl(0 88% 63%);   --c2: hsl(24 88% 63%);  --c3: hsl(48 88% 63%);  --c4: hsl(120 88% 63%);
+  --c5: hsl(192 88% 63%); --c6: hsl(240 88% 63%); --c7: hsl(288 88% 63%); --c8: #6f7592;
+  --c9: hsl(336 88% 63%); --c10: hsl(72 88% 63%); --c11: hsl(168 88% 63%); --c12: hsl(216 88% 63%);
+  --c13: hsl(264 88% 63%); --c14: hsl(96 88% 63%); --c15: hsl(144 88% 63%); --c16: hsl(312 88% 63%);
+  color-scheme: dark; /* 브라우저의 강제 다크 모드가 색을 바꾸지 않게 */
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
@@ -51,7 +55,15 @@ nav { display: flex; gap: 6px; flex-wrap: wrap; }
 .cell[data-c="5"]::before, .pc.k5::before { background: var(--c5); }
 .cell[data-c="6"]::before, .pc.k6::before { background: var(--c6); }
 .cell[data-c="7"]::before, .pc.k7::before { background: var(--c7); }
-.cell[data-c="8"]::before { background: var(--c8); }
+.cell[data-c="9"]::before, .pc.k9::before { background: var(--c9); }
+.cell[data-c="10"]::before, .pc.k10::before { background: var(--c10); }
+.cell[data-c="11"]::before, .pc.k11::before { background: var(--c11); }
+.cell[data-c="12"]::before, .pc.k12::before { background: var(--c12); }
+.cell[data-c="13"]::before, .pc.k13::before { background: var(--c13); }
+.cell[data-c="14"]::before, .pc.k14::before { background: var(--c14); }
+.cell[data-c="15"]::before, .pc.k15::before { background: var(--c15); }
+.cell[data-c="16"]::before, .pc.k16::before { background: var(--c16); }
+.cell[data-c="8"]::before { background: repeating-linear-gradient(135deg, var(--c8) 0 4px, #5c617c 4px 8px); }
 .cell.ghost::before { background: rgba(255,255,255,.28); }
 .cell.will::before { filter: brightness(1.5); box-shadow: 0 0 10px var(--accent); }
 .cell.pop::after { content: ""; position: absolute; inset: 2px; border-radius: 5px; background: #fff; animation: pop .45s forwards; }

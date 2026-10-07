@@ -27,6 +27,18 @@ test('모양 목록에 중복이 없고 모두 5x5 안에 들어간다', () => {
   for (const s of SHAPES) assert.ok(s.w <= 5 && s.h <= 5);
 });
 
+test('모양(기본형)마다 고유한 색이 있고, 회전형은 같은 색이며, 기본 블럭 색과 겹치지 않는다', () => {
+  const byBase = new Map();
+  for (const s of SHAPES) {
+    const base = s.name.replace(/_\d+$/, '');
+    if (byBase.has(base)) assert.equal(byBase.get(base), s.color, `${base} 회전형 색 불일치`);
+    byBase.set(base, s.color);
+    assert.notEqual(s.color, G.STONE);
+    assert.ok(Number.isInteger(s.color) && s.color >= 1);
+  }
+  assert.equal(new Set(byBase.values()).size, byBase.size, '기본형끼리 색이 겹침');
+});
+
 test('새 판: 기본 블럭이 깔리고, 완성된 줄이 없고, 놓을 수 있다', () => {
   for (let seed = 0; seed < 200; seed++) {
     const s = G.newGame({ seed });
