@@ -99,15 +99,40 @@ export function newGame({ mode = 'classic', seed, startPoints = 0, dailyDate = n
     v: STATE_VERSION, mode, dailyDate, rng,
     board: makeBoard(rng),
     tray: [0, 0, 0],
+    trayBombs: [null, null, null], // 슬롯별 폭탄이 붙은 칸 번호(shape.cells의 인덱스) 또는 null
+    bombs: [],                     // 보드 위 폭탄 칸 번호
+    bombGauge: 0, bombCharges: 0,  // 지운 줄 누적, 다음 블럭에 붙일 폭탄 수
     level: 1,
     score: 0, points: startPoints, combo: 0, bestCombo: 0,
     trayRefreshes: 0,
     moves: 0, lines: 0, stuck: false, over: false,
   };
-  state.tray = state.tray.map(() => randomShape(rng));
+  for (let i = 0; i < 3; i++) newPiece(state, i);
   ensureMove(state);
   return state;
 }
+
+// 옛 저장 판(폭탄 없음)도 돌아가게 빠진 필드를 채운다.
+function ensureBombFields(state) {
+  state.trayBombs ??= [null, null, null];
+  state.bombs ??= [];
+  state.bombGauge ??= 0;
+  state.bombCharges ??= 0;
+}
+
+// 슬롯에 새 블럭을 뽑는다. 충전된 폭탄이 있으면 블럭의 한 칸에 붙인다.
+function newPiece(state, slot) {
+  ensureBombFields(state);
+  const id = randomShape(state.rng, state.level ?? 1);
+  state.tray[slot] = id;
+  if (state.bombCharges > 0) {
+    state.bombCharges -= 1;
+    state.trayBombs[slot] = Math.floor(rand(state.rng) * SHAPES[id].cells.length);
+  } else {
+    state.trayBombs[slot] = null;
+  }
+}
+export const bombLinesLeft = (state) => Math.max(0, CFG.bomb.linesPerBomb - (state.bombGauge ?? 0));
 
 export function canPlace(state, shapeId, r, c) {
   const shape = SHAPES[shapeId];
@@ -153,24 +178,50 @@ function updateStatus(state) {
 // 새 판을 시작하거나 유료 리프레시 직후에는 최소 한 수가 있도록 보장한다.
 function ensureMove(state) {
   for (let i = 0; i < 50 && !anyMove(state); i++) {
-    state.tray = state.tray.map(() => randomShape(state.rng, state.level ?? 1));
+    for (let s = 0; s < 3; s++) newPiece(state, s);
   }
 }
 
 export function place(state, slot, r, c) {
   const shapeId = state.tray[slot];
   if (state.over || shapeId == null || !canPlace(state, shapeId, r, c)) return null;
+  ensureBombFields(state);
   const shape = SHAPES[shapeId];
   const placed = shape.cells.map(([dr, dc]) => idx(r + dr, c + dc));
   for (const i of placed) state.board[i] = shape.color;
+  const bombCell = state.trayBombs[slot];
+  const placedBomb = bombCell != null ? placed[bombCell] : null;
+  if (placedBomb != null) state.bombs.push(placedBomb);
 
+  // 1차: 꽉 찬 줄. 2차~: 지워진 칸에 폭탄이 있으면 그 줄·칸이 십자로 터진다 (연쇄).
   const { rows, cols } = linesIfPlaced(state, shapeId, r, c);
   const cleared = new Set();
-  for (const row of rows) for (let i = 0; i < CFG.size; i++) cleared.add(idx(row, i));
-  for (const col of cols) for (let i = 0; i < CFG.size; i++) cleared.add(idx(i, col));
+  const waves = []; // [{ cells, rows, cols, bomb }] 터지는 순서. 연출용
+  const lineCells = [];
+  for (const row of rows) for (let i = 0; i < CFG.size; i++) { const k = idx(row, i); if (!cleared.has(k)) { cleared.add(k); lineCells.push(k); } }
+  for (const col of cols) for (let i = 0; i < CFG.size; i++) { const k = idx(i, col); if (!cleared.has(k)) { cleared.add(k); lineCells.push(k); } }
+  if (lineCells.length) waves.push({ cells: lineCells, rows: rows.slice(), cols: cols.slice(), bomb: null });
+  const exploded = [];
+  let bombLines = 0;
+  for (let w = 0; w < waves.length; w++) {
+    for (const k of waves[w].cells) {
+      if (!state.bombs.includes(k) || exploded.includes(k)) continue;
+      exploded.push(k);
+      const br = Math.floor(k / CFG.size), bc = k % CFG.size;
+      const cellsW = [];
+      for (let i = 0; i < CFG.size; i++) {
+        for (const q of [idx(br, i), idx(i, bc)]) {
+          if (!cleared.has(q) && state.board[q]) { cleared.add(q); cellsW.push(q); }
+        }
+      }
+      bombLines += 2;
+      waves.push({ cells: cellsW, rows: [br], cols: [bc], bomb: k });
+    }
+  }
   for (const i of cleared) state.board[i] = 0;
+  state.bombs = state.bombs.filter((k) => !cleared.has(k));
 
-  const lineCount = rows.length + cols.length;
+  const lineCount = rows.length + cols.length + bombLines;
   const level = state.level ?? levelOf(state); // 옛 저장 판에는 level이 없다
   let gain = 0;
   if (lineCount > 0) {
@@ -180,6 +231,12 @@ export function place(state, slot, r, c) {
     const comboMult = Math.min(CFG.comboMaxMult, 1 + CFG.comboStep * (state.combo - 1));
     gain = Math.round(cleared.size * CFG.pointsPerCell * lineMult * comboMult * scoreMult(level));
     state.lines += lineCount;
+    // 폭탄 게이지
+    state.bombGauge += lineCount;
+    while (state.bombGauge >= CFG.bomb.linesPerBomb) {
+      state.bombGauge -= CFG.bomb.linesPerBomb;
+      state.bombCharges = Math.min(CFG.bomb.maxCharges, state.bombCharges + 1);
+    }
   } else {
     state.combo = 0;
   }
@@ -195,10 +252,11 @@ export function place(state, slot, r, c) {
     levelUp = state.level;
     stones = dropStones(state, Math.min(CFG.level.maxStones, (state.level - 1) * CFG.level.stonesPerLevel));
   }
-  state.tray[slot] = randomShape(state.rng, state.level); // 놓은 자리에 즉시 새 블럭
+  newPiece(state, slot); // 놓은 자리에 즉시 새 블럭
   updateStatus(state);
 
-  return { shapeId, placed, cleared: [...cleared], rows, cols, lineCount, gain, combo: state.combo, level: state.level, levelUp, stones };
+  return { shapeId, placed, cleared: [...cleared], rows, cols, lineCount, gain, combo: state.combo, level: state.level, levelUp, stones,
+    waves, bombs: exploded, placedBomb };
 }
 
 export function refreshTray(state) {
@@ -206,7 +264,7 @@ export function refreshTray(state) {
   if (state.over || state.points < cost) return false;
   state.points -= cost;
   state.trayRefreshes += 1;
-  state.tray = state.tray.map(() => randomShape(state.rng, state.level ?? 1));
+  for (let s = 0; s < 3; s++) newPiece(state, s);
   ensureMove(state);
   updateStatus(state);
   return true;

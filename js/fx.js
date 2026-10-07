@@ -110,6 +110,31 @@ export function createFX(canvas) {
     }
   }
 
+  // 폭탄 폭발: 폭탄 자리에서 큰 충격파 + 가로·세로 레이저 + 불기둥 + 칸 연쇄 폭발. wave가 클수록(연쇄) 더 크다
+  function bombBlast(at, u, lines, cells, wave = 0) {
+    if (reduce) return;
+    const p = 2 + Math.min(2, wave);
+    flash(wave ? COOL[2] : HOT[1], 0.22 + wave * 0.06, 0.3);
+    ring(at.x, at.y, '#fff', 2, u * 2.2, 0.4, 8);
+    ring(at.x, at.y, HOT[1], u * 0.5, u * 10, 0.8, 12, 0.05);
+    for (const l of lines) {
+      const a = l.horiz ? 0 : Math.PI / 2;
+      laser(at.x, at.y, a, l.len, wave ? COOL[2] : HOT[2], 0, 14);
+      laser(at.x, at.y, a + Math.PI, l.len, wave ? COOL[2] : HOT[2], 0, 14);
+    }
+    for (let k = 0; k < 12; k++) ray(at.x, at.y, k % 2 ? HOT[1] : '#fff', (k / 12) * TAU, u * 4);
+    for (let k = 0; k < n(40 + p * 15); k++) spark(at.x, at.y, k % 3 ? HOT[k % HOT.length] : '#fff', 1.2 + p * 0.2, 1.5, 0, 280);
+    for (let k = 0; k < n(24); k++) flame(at.x + rnd(-u, u), at.y + rnd(-u * 0.5, u * 0.5), 1.4, rnd(0, 0.15));
+    for (const c of cells) {
+      const d = Math.hypot(c.x - at.x, c.y - at.y) / u * 0.035;
+      for (let k = 0; k < n(2); k++) shard(c.x, c.y, c.color, 1, d);
+      for (let k = 0; k < n(6); k++) spark(c.x, c.y, k % 2 ? c.color : '#fff', 1, 1, d);
+      for (let k = 0; k < n(3); k++) flame(c.x + rnd(-u * 0.3, u * 0.3), c.y, 1, d);
+      ring(c.x, c.y, c.color, 2, u * 0.9, 0.3, 3, d);
+    }
+    if (wave >= 1) for (let k = 0; k < 2; k++) rocket(at.x + rnd(-u, u), at.y, pick(COOL), 1.2, 0.2 + k * 0.15);
+  }
+
   // 블럭이 보드에 닿을 때: 작은 충격파 + 먼지
   function land(cells, color, impact, u) {
     if (reduce) return;
@@ -282,5 +307,5 @@ export function createFX(canvas) {
     else { raf = 0; ctx.clearRect(0, 0, W, H); }
   }
 
-  return { resize, explode, land, levelUp, perfect, setFever, get count() { return parts.length; } };
+  return { resize, explode, bombBlast, land, levelUp, perfect, setFever, get count() { return parts.length; } };
 }

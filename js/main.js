@@ -105,30 +105,34 @@ for (let i = 0; i < 3; i++) {
   slots.push(d);
 }
 
-function pieceEl(shapeId) {
+function pieceEl(shapeId, bombCell = null) {
   const s = SHAPES[shapeId];
   const el = document.createElement('div');
   el.className = 'piece';
   el.style.width = `calc(var(--u) * ${s.w})`;
   el.style.height = `calc(var(--u) * ${s.h})`;
-  for (const [r, c] of s.cells) {
+  s.cells.forEach(([r, c], k) => {
     const p = document.createElement('div');
-    p.className = `pc k${s.color}`;
+    p.className = `pc k${s.color}` + (k === bombCell ? ' bomb' : '');
     p.style.left = `calc(var(--u) * ${c})`;
     p.style.top = `calc(var(--u) * ${r})`;
     el.appendChild(p);
-  }
+  });
   return el;
 }
 
 function render(freshSlots = []) {
+  const bombSet = new Set(state.bombs || []);
   state.board.forEach((v, i) => {
     if (v) cells[i].dataset.c = v; else delete cells[i].dataset.c;
+    cells[i].classList.toggle('bomb', bombSet.has(i));
   });
   slots.forEach((slot, i) => {
     const id = state.tray[i];
-    if (slot.dataset.shape !== String(id) || freshSlots.includes(i)) {
-      const el = pieceEl(id);
+    const bomb = state.trayBombs?.[i] ?? null;
+    if (slot.dataset.shape !== String(id) || slot.dataset.bomb !== String(bomb) || freshSlots.includes(i)) {
+      const el = pieceEl(id, bomb);
+      slot.dataset.bomb = String(bomb);
       if (freshSlots.includes(i)) el.classList.add('fresh');
       slot.replaceChildren(el);
       slot.dataset.shape = id;
@@ -149,6 +153,11 @@ function render(freshSlots = []) {
   $('btnMode').classList.toggle('on', mode === 'daily');
 
   const tc = G.trayCost(state);
+  // 폭탄 게이지
+  const left = G.bombLinesLeft(state), charges = state.bombCharges || 0;
+  $('bombGauge').classList.toggle('ready', charges > 0);
+  $('bombBar').style.width = `${100 * (1 - left / CFG.bomb.linesPerBomb)}%`;
+  $('bombText').textContent = charges > 0 ? (charges > 1 ? `×${charges} 준비` : '준비!') : `${left}줄`;
   setText('trayCost', `${fmt(tc)}P`);
   $('btnTray').disabled = state.over || state.points < tc;
   $('btnTray').classList.toggle('urge', state.stuck);
@@ -438,6 +447,7 @@ function shakeBoard(tier) {
 
 function doPlace(slot, r, c) {
   const before = state.board.slice(); // 지워지기 전 색을 이펙트에 쓴다
+  before.charges = state.bombCharges || 0;
   const ev = G.place(state, slot, r, c);
   if (!ev) return;
   persist();
@@ -451,7 +461,7 @@ function doPlace(slot, r, c) {
   if (!ev.lineCount) buzz(BUZZ.land);
 
   if (ev.lineCount > 0) {
-    const tier = comboTier(ev);
+    const tier = Math.min(4, comboTier(ev) + (ev.bombs.length >= 2 ? 2 : ev.bombs.length ? 1 : 0));
     const colors = {};
     for (const i of ev.cleared) {
       colors[i] = colorOf(before[i] || shapeColor);
@@ -459,26 +469,48 @@ function doPlace(slot, r, c) {
     }
     const u = cellXY(0).u;
     const pts = ev.cleared.map(cellXY);
-    // 놓은 자리에서 먼 칸일수록 늦게 터진다 (연쇄 폭발)
+    // 놓은 자리에서 먼 칸일수록 늦게 터지고(연쇄 폭발), 폭탄 파동은 0.3초씩 뒤에 터진다
+    const WAVE = 0.3;
     let maxDelay = 0;
-    ev.cleared.forEach((i, k) => {
-      const d = Math.hypot(pts[k].x - impact.x, pts[k].y - impact.y) / u * 0.035;
-      maxDelay = Math.max(maxDelay, d);
-      cells[i].style.setProperty('--d', `${d.toFixed(3)}s`);
+    const delayOf = {};
+    ev.waves.forEach((w, wi) => {
+      const origin = w.bomb != null ? cellXY(w.bomb) : impact;
+      for (const i of w.cells) {
+        const c = cellXY(i);
+        const d = wi * WAVE + Math.hypot(c.x - origin.x, c.y - origin.y) / u * 0.035;
+        delayOf[i] = d; maxDelay = Math.max(maxDelay, d);
+        cells[i].style.setProperty('--d', `${d.toFixed(3)}s`);
+      }
     });
     flash(ev.cleared, 'pop', 500 + maxDelay * 1000);
+    // 폭탄 파동: 폭탄 자리에서 십자 레이저와 큰 폭발
+    ev.waves.forEach((w, wi) => {
+      if (w.bomb == null) return;
+      const b = cellXY(w.bomb);
+      const bl = [
+        { cx: cellXY(w.rows[0] * N + N / 2).x, cy: b.y, horiz: true, len: u * N },
+        { cx: b.x, cy: cellXY(Math.floor(N / 2) * N + w.cols[0]).y, horiz: false, len: u * N },
+      ];
+      setTimeout(() => {
+        fx.bombBlast({ x: b.x, y: b.y }, u, bl, w.cells.map((i) => ({ ...cellXY(i), color: colors[i] })), wi);
+        boom(3, 0); buzz(BUZZ.clear3);
+        shakeBoard(3 + (wi >= 2 ? 1 : 0));
+      }, wi * WAVE * 1000);
+    });
     const lines = [
       ...ev.rows.map((row) => { const a = cellXY(row * N), b = cellXY(row * N + N - 1); return { cx: (a.x + b.x) / 2, cy: a.y, horiz: true, len: b.x - a.x + u }; }),
       ...ev.cols.map((col) => { const a = cellXY(col), b = cellXY((N - 1) * N + col); return { cx: a.x, cy: (a.y + b.y) / 2, horiz: false, len: b.y - a.y + u }; }),
     ];
     const center = { x: pts.reduce((a, p) => a + p.x, 0) / pts.length, y: pts.reduce((a, p) => a + p.y, 0) / pts.length };
-    fx.explode({ impact, cells: ev.cleared.map((i) => ({ ...cellXY(i), color: colors[i] })), lines, center, u, power: tier });
+    const w0 = ev.waves[0]?.bomb == null ? ev.waves[0] : null; // 1차 파동(꽉 찬 줄)만 일반 폭발로
+    if (w0) fx.explode({ impact, cells: w0.cells.map((i) => ({ ...cellXY(i), color: colors[i] })), lines, center, u, power: tier });
     const b = $('board');
     b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash');
 
     const notes = [];
     if (ev.lineCount > 1) notes.push(['더블', '트리플', '쿼드러플'][Math.min(ev.lineCount, 4) - 2] + ` ${ev.lineCount}줄`);
     if (ev.combo > 1) notes.push(`${ev.combo} 콤보`);
+    if (ev.bombs.length) notes.unshift(ev.bombs.length >= 2 ? `💣 연쇄 폭발 ×${ev.bombs.length}` : '💣 폭발');
     const word = tier >= 2 ? COMBO_WORDS[tier][(ev.combo + ev.lineCount) % 3] + ' ' : '';
     const el = $('comboText');
     el.classList.remove('t2', 't3', 't4', 'huge');
@@ -508,6 +540,12 @@ function doPlace(slot, r, c) {
   } else {
     beep(260, 0.05);
     setFever(0);
+  }
+
+  if ((state.bombCharges || 0) > (before.charges || 0)) {
+    const g = $('bombGauge');
+    g.classList.remove('charged'); void g.offsetWidth; g.classList.add('charged');
+    setTimeout(() => toast('💣 폭탄 충전! 다음 블럭에 붙습니다', 1800), ev.lineCount ? 900 : 0);
   }
 
   if (ev.levelUp) {

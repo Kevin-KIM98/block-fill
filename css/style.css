@@ -153,13 +153,27 @@ nav { display: flex; gap: 6px; flex-wrap: wrap; }
 .piece { position: relative; pointer-events: none; }
 .pc { position: absolute; width: var(--u); height: var(--u); }
 .pc::before { content: ""; position: absolute; inset: 1.5px; border-radius: 4px; }
+/* 폭탄 칸: 검은 구슬 + 노란 불빛 */
+.pc.bomb::after, .cell.bomb::after { content: ""; position: absolute; inset: 24%; border-radius: 50%; z-index: 1;
+  background: radial-gradient(circle at 35% 32%, #8a8fa8, #1a1c26 55%, #000 100%); box-shadow: 0 0 0 1.5px rgba(255,255,255,.35), 0 0 10px 2px #ffb020; animation: fuse .7s infinite alternate; }
+.cell.bomb::after { inset: 22%; }
+@keyframes fuse { from { box-shadow: 0 0 0 1.5px rgba(255,255,255,.35), 0 0 6px 1px #ffb020; } to { box-shadow: 0 0 0 1.5px rgba(255,255,255,.6), 0 0 16px 4px #ff5d6c; } }
+
 .slot .piece { --u: calc(var(--cell) * .5); }
 .slot .piece.fresh { animation: fresh .25s; }
 @keyframes fresh { from { transform: scale(.3); opacity: 0; } }
 #drag { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 20; --u: var(--cell); display: none; opacity: .92; }
 
-.actions { width: calc(var(--cell) * 8 + 8px); display: grid; grid-template-columns: 1fr; gap: 8px; }
-.actions button { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px;
+.actions { width: calc(var(--cell) * 8 + 8px); display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.gauge { display: flex; align-items: center; gap: 5px; background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 0 8px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.gauge .bar { width: 34px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.gauge .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffb020, #ff5d6c); transition: width .3s; }
+.gauge b { color: var(--text); font-variant-numeric: tabular-nums; }
+.gauge.ready { border-color: var(--accent); color: var(--accent); animation: urge 1s infinite; }
+.gauge.ready .bar i { width: 100% !important; }
+.gauge.charged { animation: bump .5s 2; }
+
+.actions button { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; white-space: nowrap; min-width: 0;
   display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
 .actions button b { color: var(--accent); }
 .actions button:disabled { opacity: .4; }

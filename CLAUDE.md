@@ -19,7 +19,7 @@
 
 ## 명령
 - 테스트: `node tests/game.test.mjs`
-- 브라우저 검수(E2E): `python3 -m http.server 8123 &` 뒤 `node tests/e2e.mjs` (Playwright 필요. 결과 화면은 `tests/e2e-out/`). 서버를 끌 때 `pkill -f "[h]ttp.server 8123"`처럼 대괄호를 써야 자기 셸이 죽지 않는다
+- 브라우저 검수(E2E): `python3 -m http.server 8123 &` 뒤 `node tests/e2e.mjs` (Playwright 필요. 결과 화면은 `tests/e2e-out/`). 서버 시작과 종료는 서로 다른 명령(셸)에서 한다. 같은 명령줄에 `http.server 8123` 글자가 있으면 `pkill -f`가 자기 셸까지 죽인다
 - 실행: `python3 -m http.server 8000`
 - 검수 기록: `design/progress.md`에 반복마다 한 줄씩 남긴다
 

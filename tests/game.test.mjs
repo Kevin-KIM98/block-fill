@@ -200,6 +200,84 @@ test('레벨업 순간 기본 블럭이 떨어지되 줄을 완성시키지 않�
   }
 });
 
+test('폭탄: 줄 4개를 지우면 충전되고 다음 블럭에 붙는다', () => {
+  const s = empty();
+  assert.equal(G.bombLinesLeft(s), CFG.bomb.linesPerBomb);
+  // 가로 3줄 + 세로 1줄을 한 번에: 0~2행을 0열만 비우고, 0열의 나머지 칸을 채운다
+  for (let r = 0; r < 3; r++) for (let c = 1; c < N; c++) s.board[r * N + c] = 1;
+  for (let r = 3; r < N; r++) s.board[r * N] = 1;
+  s.tray[0] = shapeByName('l4_0'); // 'l4' 기본형: #., #., ## → (0,0),(1,0),(2,0),(2,1)
+  s.trayBombs = [null, null, null];
+  // l4_0 는 (2,1)도 차지하므로 그 칸을 비워 둔다
+  s.board[2 * N + 1] = 0;
+  const ev = G.place(s, 0, 0, 0);
+  assert.equal(ev.lineCount, 4, `줄 ${ev.lineCount}`);
+  assert.equal(G.bombLinesLeft(s), CFG.bomb.linesPerBomb);
+  // 충전된 폭탄은 같은 수에서 새로 뽑힌 블럭(슬롯 0)에 바로 붙고, 충전은 소모된다
+  assert.ok(Number.isInteger(s.trayBombs[0]) && s.trayBombs[0] < SHAPES[s.tray[0]].cells.length);
+  assert.equal(s.bombCharges, 0);
+  assert.equal(s.trayBombs[1], null);
+});
+
+test('폭탄 칸이 든 줄이 지워지면 그 가로줄·세로줄이 십자로 터진다', () => {
+  const s = empty({ trayBombs: [0, null, null] }); // 슬롯 0 블럭의 첫 칸이 폭탄
+  for (let c = 1; c < N; c++) s.board[c] = 1;           // 0행이 (0,0)만 비어 있음
+  for (let r = 1; r < N - 1; r++) s.board[r * N] = 2;   // 0열은 (7,0)만 비어 완성 줄이 아님 → 폭탄 십자로만 터져야 함
+  s.board[5 * N + 5] = 3;                                // 십자 밖의 칸은 남는다
+  s.tray[0] = shapeByName('dot_0');
+  const ev = G.place(s, 0, 0, 0);
+  assert.equal(ev.bombs.length, 1);
+  assert.equal(ev.placedBomb, 0);
+  assert.equal(ev.lineCount, 1 + 2); // 꽉 찬 줄 1 + 폭탄 십자 2
+  assert.equal(ev.waves.length, 2);
+  assert.equal(ev.waves[1].bomb, 0);
+  assert.equal(ev.cleared.length, N + (N - 2)); // 0행 8칸 + 0열의 채워진 6칸 (빈 칸은 세지 않음)
+  for (let r = 0; r < N; r++) assert.equal(s.board[r * N], 0);
+  assert.equal(s.board[5 * N + 5], 3);
+  assert.deepEqual(s.bombs, []);
+});
+
+test('십자에 걸린 폭탄은 연쇄로 터지고, 안 걸린 폭탄은 남는다', () => {
+  const s = empty({ trayBombs: [0, null, null], bombs: [3 * N + 0, 6 * N + 6] }); // (3,0)과 (6,6)에 폭탄
+  for (let c = 1; c < N; c++) s.board[c] = 1;              // 0행: (0,0)만 비어 있음
+  for (let r = 1; r < N - 1; r++) s.board[r * N] = 2;      // 0열: 1~6행 (완성 줄 아님)
+  for (let c = 1; c < N - 1; c++) s.board[3 * N + c] = 3;  // 3행: 1~6열 (완성 줄 아님)
+  s.board[6 * N + 6] = 4;
+  s.tray[0] = shapeByName('dot_0');
+  const ev = G.place(s, 0, 0, 0); // (0,0) 폭탄 → 0행 완성 → 십자(0열) → (3,0) 폭탄 연쇄 → 3행
+  assert.deepEqual(ev.bombs, [0, 3 * N]);
+  assert.equal(ev.waves.length, 3);
+  assert.equal(ev.lineCount, 1 + 2 + 2);
+  assert.equal(ev.cleared.length, N + 6 + 6);
+  for (let c = 0; c < N; c++) { assert.equal(s.board[c], 0); assert.equal(s.board[3 * N + c], 0); }
+  for (let r = 0; r < N; r++) assert.equal(s.board[r * N], 0);
+  assert.deepEqual(s.bombs, [6 * N + 6]); // 십자 밖의 폭탄은 그대로
+  assert.equal(s.board[6 * N + 6], 4);
+});
+
+
+test('폭탄 필드가 없는 옛 판도 그대로 이어지고, 무작위 판에서 폭탄은 항상 채워진 칸 위에만 있다', () => {
+  const s = empty();
+  delete s.trayBombs; delete s.bombs; delete s.bombGauge; delete s.bombCharges;
+  s.tray[0] = shapeByName('dot_0');
+  assert.ok(G.place(s, 0, 0, 0));
+  assert.deepEqual(s.bombs, []);
+  for (let seed = 0; seed < 200; seed++) {
+    const g = G.newGame({ seed, startPoints: 10 ** 6 });
+    let guard = 0;
+    while (!g.over && guard++ < 400) {
+      if (g.stuck) { G.refreshTray(g); continue; }
+      let done = false;
+      for (let slot = 0; slot < 3 && !done; slot++) for (let i = 0; i < N * N && !done; i++) {
+        if (G.canPlace(g, g.tray[slot], Math.floor(i / N), i % N)) { G.place(g, slot, Math.floor(i / N), i % N); done = true; }
+      }
+      for (const b of g.bombs) assert.ok(g.board[b], '폭탄이 빈 칸 위에 있음');
+      assert.equal(new Set(g.bombs).size, g.bombs.length);
+      g.trayBombs.forEach((b, k) => { if (b != null) assert.ok(b >= 0 && b < SHAPES[g.tray[k]].cells.length); });
+    }
+  }
+});
+
 test('리프레시 비용은 쓸 때마다 오른다', () => {
   const s = empty({ points: 100000 });
   const tray = [];

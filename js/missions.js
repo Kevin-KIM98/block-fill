@@ -13,6 +13,7 @@ const POOL = [
   { id: 'games', kind: 'sum', tiers: [2, 3, 4], text: (n) => `${n}판 끝까지 하기` },
   { id: 'big', kind: 'sum', tiers: [1, 2], text: (n) => `한 번에 16칸 이상 지우기 ${n}회` },
   { id: 'daily', kind: 'sum', tiers: [1], text: () => '오늘의 도전 끝까지 하기' },
+  { id: 'bomb', kind: 'sum', tiers: [2, 4, 6], text: (n) => `폭탄 ${n}개 터뜨리기` },
 ];
 
 // 날짜 문자열(YYYY-MM-DD) → 그날의 미션 3개. 모두에게 같다.
@@ -53,6 +54,7 @@ export function onPlace(m, missions, ev, state, mode) {
   if (ev.lineCount >= 2) add(bump(m, missions, 'double', 1, 'sum'));
   if (ev.combo === 3) add(bump(m, missions, 'combo3', 1, 'sum'));
   if (ev.cleared.length >= 16) add(bump(m, missions, 'big', 1, 'sum'));
+  if (ev.bombs?.length) add(bump(m, missions, 'bomb', ev.bombs.length, 'sum'));
   if (mode === 'classic') {
     add(bump(m, missions, 'score', state.score, 'max'));
     add(bump(m, missions, 'level', state.level ?? 1, 'max'));
