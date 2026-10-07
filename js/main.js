@@ -160,6 +160,24 @@ async function loadRivals() {
   updateRival();
 }
 
+// ---------- 실시간 랭킹 ----------
+// 일반 모드에서 점수가 바뀌면 4초 뒤 서버에 보고한다(연타 방지). 랭킹 창·1위 표시는 주기적으로 다시 읽는다.
+let liveTimer = 0, liveSent = -1;
+function scheduleLive(delay = 4000) {
+  if (mode !== 'classic' || !O.enabled() || !O.profile || state.over) return;
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(flushLive, delay);
+}
+async function flushLive() {
+  clearTimeout(liveTimer); liveTimer = 0;
+  if (mode !== 'classic' || !O.profile || !state || state.over || state.score === liveSent) return;
+  liveSent = state.score;
+  if (await O.reportLive(state.score)) loadChampion();
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushLive(); });
+// 화면이 켜져 있는 동안 30초마다 1위·다음 목표를 새로 읽는다
+setInterval(() => { if (!document.hidden && O.profile) { loadChampion(); loadRivals(); } }, 30000);
+
 // 전체 1위를 보드 위에 보여 준다 (로그인 상태일 때)
 async function loadChampion() {
   const el = $('champ');
@@ -638,6 +656,7 @@ function doPlace(slot, r, c) {
   }
   checkAchievements(ev);
   announceMissions(M.onPlace(todayMissions(), missionList(), ev, state, mode));
+  scheduleLive(ev.lineCount ? 1500 : 4000); // 줄을 지웠으면 빨리 보고
   if (state.over) setTimeout(finish, 500);
   else if (state.stuck) sfx('stuck');
 }
@@ -652,6 +671,7 @@ function useRefresh() {
 }
 
 async function finish() {
+  clearTimeout(liveTimer); liveTimer = 0; liveSent = -1;
   const prevBest = best();
   const isRecord = mode === 'classic' && state.score > prevBest;
   if (mode === 'classic') {
@@ -894,9 +914,9 @@ function listMessage(listEl, msg) {
   listEl.replaceChildren(li);
 }
 
-async function loadRank() {
+async function loadRank(quiet = false) {
   const list = $('rankList');
-  listMessage(list, '불러오는 중…');
+  if (!quiet) listMessage(list, '불러오는 중…');
   try {
     const rows = await O.leaderboard(rankSel.scope, rankSel.period);
     if (!rows.length) { listMessage(list, '아직 기록이 없습니다. 첫 번째 주인공이 되어 보세요!'); return; }
@@ -935,8 +955,12 @@ function openRank(period) {
   $('dlgRank').showModal();
   loadRank();
   loadChampion();
+  clearInterval(rankPoll);
+  rankPoll = setInterval(() => { if (!document.hidden && $('dlgRank').open) loadRank(true); }, 8000);
 }
 $('btnRank').addEventListener('click', () => openRank());
+let rankPoll = 0;
+$('dlgRank').addEventListener('close', () => { clearInterval(rankPoll); rankPoll = 0; });
 
 // ---------- 내 기록·업적 ----------
 let recTab = 'history';

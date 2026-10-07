@@ -90,6 +90,10 @@
 ## 반복 15 (v2.10.0, 닉네임 변경)
 - DB 함수 set_nickname(2~12자, 본인만) 추가: migrations/001 + schema.sql. 계정 창에 변경 칸. 함수가 아직 없으면 안내 문구.
 
+## 반복 16 (v2.11.0, 실시간 랭킹)
+- profiles.live_score/live_updated_at + report_live 함수, submit_score가 끝난 판에서 live를 0으로, leaderboard가 live도 집계 (migrations/002 + schema.sql).
+- 클라이언트: 점수 변경 4초(클리어 1.5초) 디바운스 보고, 숨김 전환 시 즉시 보고, 랭킹 창 8초·1위/목표 30초 폴링. 함수가 없으면 조용히 비활성.
+
 ## 남은 것
-- **사용자 작업 필요**: Supabase SQL Editor에서 `supabase/migrations/001_set_nickname.sql` 실행 (닉네임 변경 켜기).
+- **사용자 작업 필요**: Supabase SQL Editor에서 `supabase/migrations/001_set_nickname.sql`(닉네임 변경), `002_live_score.sql`(실시간 랭킹) 실행.
 - 사용자 기기에서 가입 → 점수 등록 → 친구 추가 → 랭킹 확인 (`design/plan.md` 6번).

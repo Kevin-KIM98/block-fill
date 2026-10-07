@@ -12,6 +12,8 @@ create table if not exists public.profiles (
   games_played integer not null default 0,
   streak integer not null default 0,
   last_play_date date,
+  live_score integer not null default 0,   -- 플레이 중인 점수 (실시간 랭킹, migrations/002)
+  live_updated_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -91,7 +93,9 @@ begin
       when last_play_date = v_today then streak
       when last_play_date = v_today - 1 then streak + 1
       else 1 end,
-    last_play_date = v_today
+    last_play_date = v_today,
+    live_score = case when p_mode = 'classic' then 0 else live_score end,
+    live_updated_at = case when p_mode = 'classic' then now() else live_updated_at end
   where id = auth.uid();
 end $$;
 
@@ -108,31 +112,44 @@ begin
 end $$;
 grant execute on function public.set_nickname(text) to authenticated;
 
+-- 플레이 중 점수 보고 (실시간 랭킹). migrations/002 와 같은 내용
+create or replace function public.report_live(p_score integer)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'NOT_SIGNED_IN'; end if;
+  update profiles set live_score = greatest(0, least(coalesce(p_score, 0), 5000000)), live_updated_at = now()
+  where id = auth.uid();
+end $$;
+grant execute on function public.report_live(integer) to authenticated;
+
 -- 랭킹. p_scope: global | friends, p_period: all | week | daily
 create or replace function public.leaderboard(p_scope text, p_period text, p_limit integer default 100)
 returns table (rank bigint, user_id uuid, nickname text, score integer, is_me boolean)
 language sql stable security definer set search_path = public as $$
   with pool as (
-    select p.id, p.nickname from profiles p
+    select p.id, p.nickname, p.live_score, p.live_updated_at from profiles p
     where p_scope = 'global'
        or p.id = auth.uid()
        or p.id in (select f.friend_id from friendships f where f.user_id = auth.uid())
   ),
   best as (
-    select pool.id, pool.nickname, (
-      select max(sc.score) from scores sc
-      where sc.user_id = pool.id
-        and case p_period
-          when 'daily' then sc.mode = 'daily' and sc.daily_date = (now() at time zone 'Asia/Seoul')::date
-          when 'week' then sc.mode = 'classic'
-            and sc.created_at >= date_trunc('week', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul'
-          else sc.mode = 'classic'
-        end
+    select pool.id, pool.nickname, greatest(
+      coalesce((
+        select max(sc.score) from scores sc
+        where sc.user_id = pool.id
+          and case p_period
+            when 'daily' then sc.mode = 'daily' and sc.daily_date = (now() at time zone 'Asia/Seoul')::date
+            when 'week' then sc.mode = 'classic'
+              and sc.created_at >= date_trunc('week', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul'
+            else sc.mode = 'classic'
+          end
+      ), 0),
+      case when p_period <> 'daily' and pool.live_updated_at > now() - interval '2 days' then pool.live_score else 0 end
     ) as top
     from pool
   )
   select rank() over (order by b.top desc), b.id, b.nickname, b.top, b.id = auth.uid()
-  from best b where b.top is not null
+  from best b where b.top > 0
   order by b.top desc
   limit greatest(1, least(p_limit, 200));
 $$;
@@ -170,6 +187,7 @@ $$;
 
 revoke all on function public.submit_score(integer, text, date) from public, anon;
 revoke all on function public.leaderboard(text, text, integer) from public, anon;
+revoke all on function public.report_live(integer) from public, anon;
 revoke all on function public.add_friend(text) from public, anon;
 revoke all on function public.list_friends() from public, anon;
 revoke all on function public.remove_friend(uuid) from public, anon;

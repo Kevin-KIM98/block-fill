@@ -77,6 +77,19 @@ export async function signOut() {
   profile = null;
 }
 
+// 플레이 중 점수 보고 (실시간 랭킹). 서버 함수가 아직 없거나 오프라인이면 조용히 넘어간다.
+let liveMissing = false;
+export async function reportLive(score) {
+  if (!sb || !profile || liveMissing) return false;
+  const { error } = await sb.rpc('report_live', { p_score: score });
+  if (error) {
+    if ((error.message || '').toLowerCase().includes('could not find the function')) liveMissing = true; // migrations/002 미실행
+    return false;
+  }
+  return true;
+}
+export const liveSupported = () => !liveMissing;
+
 // 점수 전송. 실패하면 기기에 보관했다가 다음에 다시 보낸다.
 export async function submitScore(score, mode, dailyDate = null) {
   if (!sb || !profile) return false;

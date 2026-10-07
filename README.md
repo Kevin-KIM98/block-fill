@@ -30,7 +30,7 @@ node tests/game.test.mjs      # 규칙 테스트
    - anon 키는 공개되어도 되는 키입니다. `service_role` 키는 절대 넣지 마세요.
 
 > 이 연동은 실제 Supabase 프로젝트에 연결해 확인하기 전 상태입니다. 처음 연결한 뒤 가입 → 점수 등록 → 친구 추가 → 랭킹 순서로 한 번 점검하세요.
-> 닉네임 변경 기능은 `supabase/migrations/001_set_nickname.sql`을 SQL Editor에서 한 번 실행해야 켜집니다 (schema.sql을 처음부터 실행했다면 이미 포함).
+> 닉네임 변경은 `supabase/migrations/001_set_nickname.sql`, 실시간 랭킹은 `002_live_score.sql`을 SQL Editor에서 한 번씩 실행해야 켜집니다 (최신 schema.sql을 처음부터 실행했다면 이미 포함).
 > 가입 시 "Email address is invalid" 오류가 나면 `ONLINE.emailDomain`을 본인 소유 도메인으로 바꾸세요 (사용자가 생긴 뒤에는 바꾸면 안 됩니다).
 
 ## 배포 (GitHub Pages)
