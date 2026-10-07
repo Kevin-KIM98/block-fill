@@ -1,5 +1,5 @@
 // 화면·조작. 규칙은 game.js, 저장은 storage.js, 서버는 online.js가 맡는다.
-import { CFG, APP_VERSION } from './config.js';
+import { CFG, APP_VERSION, BGM_URL } from './config.js';
 import { SHAPES } from './shapes.js';
 import * as G from './game.js';
 import * as S from './storage.js';
@@ -7,6 +7,7 @@ import * as O from './online.js';
 import { ACHIEVEMENTS, unlock, addHistory, rankOf } from './achievements.js';
 import * as M from './missions.js';
 import { createFX } from './fx.js';
+import * as A from './audio.js';
 
 const $ = (id) => document.getElementById(id);
 const data = S.load();
@@ -18,43 +19,15 @@ let rivals = [];          // 넘어야 할 상대 [{ nickname, score }]
 let passed = new Set();   // 이번 판에서 이미 추월 알림을 띄운 상대
 let drag = null;
 
-// ---------- 소리 ----------
-let ac = null;
-function beep(freq, dur = 0.08, delay = 0, vol = 0.07) {
-  if (data.settings.mute) return;
-  try {
-    ac ??= new AudioContext();
-    const t = ac.currentTime + delay;
-    const o = ac.createOscillator();
-    const g = ac.createGain();
-    o.type = 'triangle';
-    o.frequency.value = freq;
-    g.gain.setValueAtTime(vol, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(g).connect(ac.destination);
-    o.start(t);
-    o.stop(t + dur);
-  } catch { /* 소리를 낼 수 없는 환경 */ }
+// ---------- 소리 (js/audio.js, audio/*.wav) ----------
+const sfx = (name, opts) => A.play(name, opts);
+// 첫 조작 때 오디오를 깨우고 파일을 읽어 둔다 (브라우저 자동재생 정책)
+function wakeAudio() {
+  A.resume();
+  A.preload('audio/', BGM_URL);
+  A.startBgm();
 }
-
-// 폭발음: 잡음을 필터로 깎아 '쾅' 소리. power가 클수록 낮고 길다.
-function boom(power = 1, delay = 0) {
-  if (data.settings.mute) return;
-  try {
-    ac ??= new AudioContext();
-    const dur = 0.25 + power * 0.12;
-    const buf = ac.createBuffer(1, Math.ceil(ac.sampleRate * dur), ac.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 2;
-    const src = ac.createBufferSource(); src.buffer = buf;
-    const f = ac.createBiquadFilter(); f.type = 'lowpass';
-    const t = ac.currentTime + delay;
-    f.frequency.setValueAtTime(1800 + power * 400, t); f.frequency.exponentialRampToValueAtTime(120, t + dur);
-    const g = ac.createGain(); g.gain.setValueAtTime(0.12 + power * 0.06, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(f).connect(g).connect(ac.destination);
-    src.start(t); src.stop(t + dur);
-  } catch { /* 무시 */ }
-}
+for (const evn of ['pointerdown', 'keydown', 'touchstart']) addEventListener(evn, wakeAudio, { once: true, passive: true });
 
 // 진동(손맛). 단계별 패턴. 지원하지 않는 기기(아이폰 등)에서는 조용히 무시된다.
 const BUZZ = {
@@ -187,6 +160,23 @@ async function loadRivals() {
   updateRival();
 }
 
+// 전체 1위를 보드 위에 보여 준다 (로그인 상태일 때)
+async function loadChampion() {
+  const el = $('champ');
+  if (!O.enabled() || !O.profile) { el.hidden = true; return; }
+  try {
+    const rows = await O.leaderboard('global', 'all', 1);
+    el.hidden = false;
+    el.replaceChildren();
+    if (!rows.length) { el.textContent = '👑 아직 전체 1위가 없습니다 · 첫 주인공이 되세요!'; el.classList.remove('me'); return; }
+    const top = rows[0];
+    el.classList.toggle('me', !!top.is_me);
+    el.append(top.is_me ? '👑 전체 1위는 바로 나! ' : '👑 전체 1위 ');
+    const b = document.createElement('b'); b.textContent = top.nickname;
+    el.append(b, ` · ${fmt(top.score)}점`);
+  } catch { el.hidden = true; }
+}
+
 // 내 역대 기록(일반 모드) 중 지금 점수 바로 위 기록. 넘어설 때 한 번씩 알린다.
 function ownTargets(score) {
   const scores = [...new Set(data.local.history.filter((h) => h.mode === 'classic').map((h) => h.score))].sort((a, b) => b - a);
@@ -196,7 +186,7 @@ function ownTargets(score) {
       passed.add(key);
       const rank = scores.indexOf(sc) + 1;
       toast(rank === 1 ? '내 최고 기록을 넘었습니다!' : `내 ${rank}위 기록(${fmt(sc)})을 넘었습니다!`);
-      beep(880, 0.1); beep(1175, 0.15, 0.1);
+      sfx('pass');
     }
   }
   const idx = scores.findIndex((sc) => sc >= score);
@@ -204,13 +194,13 @@ function ownTargets(score) {
 }
 
 function updateRival() {
-  const el = $('rival');
+  const el = $('rivalText');
   const score = state.score;
   for (const r of rivals) {
     if (r.score < score && !passed.has(r.nickname)) {
       passed.add(r.nickname);
       toast(`${r.nickname} 님을 추월했습니다!`);
-      beep(880, 0.1); beep(1175, 0.15, 0.1);
+      sfx('pass', { rate: 1.1 });
       el.classList.remove('passed'); void el.offsetWidth; el.classList.add('passed');
     }
   }
@@ -284,7 +274,7 @@ function onDown(e, slot) {
   $('drag').style.display = 'block';
   slots[slot].classList.add('dragging');
   slots[slot].setPointerCapture(e.pointerId);
-  beep(420, 0.04);
+  sfx('place', { rate: 1.8, gain: 0.35 });
   onMove(e);
 }
 
@@ -342,7 +332,7 @@ function announceMissions(got) {
   S.save();
   got.forEach((mi, i) => setTimeout(() => {
     toast(`🎯 미션 달성: ${mi.text} (+${CFG.missionBonus}P 시작 보너스)`, 2600);
-    [784, 988, 1319].forEach((f, k) => beep(f, 0.12, k * 0.08));
+    sfx('mission');
     render();
   }, 1200 + i * 2700));
 }
@@ -356,7 +346,7 @@ function checkAchievements(ev) {
     const a = ACHIEVEMENTS.find((x) => x.id === id);
     setTimeout(() => {
       toast(`🏆 업적 달성: ${a.title} — ${a.desc}`, 2400);
-      [660, 880, 1320].forEach((f, k) => beep(f, 0.12, k * 0.08));
+      sfx('achieve');
     }, 700 + i * 2500);
   });
 }
@@ -516,6 +506,7 @@ function doPlace(slot, r, c) {
       const chainNo = chainWaves.indexOf(w) + 1;
       const power = w.power || 1;
       // 덩어리의 폭탄 칸들은 자기 파동 시각까지 남아 하얗게 맥동한다 (점화 예고)
+      sfx('fuse', { delay: Math.max(0, wi * WAVE - 0.25), gain: 0.8 });
       for (const bi of group) {
         cells[bi].style.setProperty('--d', `${(wi * WAVE).toFixed(3)}s`);
         cells[bi].classList.add('ignite');
@@ -529,7 +520,9 @@ function doPlace(slot, r, c) {
         fx.bombBlast(b, u, bl, w.cells.map((i) => ({ ...cellXY(i), color: colors[i] })), chainNo - 1, w.hidden, power, w.radius || 0);
         screenBlast(b, chainNo + power - 1);
         chainText(chainNo, w.hidden, power);
-        boom(3 + Math.min(2, chainNo), 0); [660, 880, 1100, 1320][Math.min(3, chainNo)] && beep([660, 880, 1100, 1320][Math.min(3, chainNo)], 0.2, 0, 0.09);
+        if (power >= 3 || chainNo >= 3) sfx('mega', { rate: 1 - Math.min(0.2, (power - 1) * 0.05) });
+        else sfx(chainNo >= 2 ? 'chain' : 'bomb', { rate: 1 + chainNo * 0.06 });
+        if (power >= 2) sfx('bomb', { rate: 0.85, gain: 0.8, delay: 0.05 });
         buzz(chainNo >= 2 || power >= 2 ? BUZZ.clear4 : BUZZ.clear3);
         shakeBoard(Math.min(4, 2 + chainNo + (power >= 2 ? 1 : 0)));
         const bd = $('board'); bd.classList.remove('punch'); void bd.offsetWidth; bd.classList.add('punch');
@@ -560,8 +553,10 @@ function doPlace(slot, r, c) {
     const wr = $('boardWrap').getBoundingClientRect();
     flyScore(`+${fmt(ev.gain)}`, { x: wr.left + center.x - FX_PAD, y: wr.top + center.y - FX_PAD });
 
-    boom(tier);
-    for (let i = 0; i < Math.min(ev.lineCount + ev.combo, 8); i++) beep(520 + i * 110 + tier * 60, 0.12, 0.05 + i * 0.06);
+    sfx(`clear${tier}`);
+    sfx('bolt', { gain: 0.7 });
+    ev.rows.concat(ev.cols).forEach((_, i) => sfx('laser', { rate: 1 + i * 0.1, gain: 0.6, delay: 0.05 + i * 0.04 }));
+    if (ev.combo >= 2) sfx('combo', { rate: 1 + Math.min(6, ev.combo) * 0.07, delay: 0.12 });
     shakeBoard(tier);
     buzz(BUZZ[`clear${tier}`]);
     setFever(ev.combo);
@@ -572,20 +567,20 @@ function doPlace(slot, r, c) {
         el.classList.remove('t2', 't3'); el.classList.add('t4', 'huge');
         showCombo('PERFECT!', '보드를 전부 비웠습니다', true);
         fx.perfect(center, u);
-        boom(3); [659, 784, 988, 1319, 1568].forEach((f, i) => beep(f, 0.2, i * 0.09, 0.09));
+        sfx('perfect');
         shakeBoard(4);
         buzz(BUZZ.perfect);
       }, 650);
     }
   } else {
-    beep(260, 0.05);
+    sfx('place', { rate: 0.9 + Math.random() * 0.2 });
     setFever(0);
   }
 
   if ((state.bombCharges || 0) > (before.charges || 0)) {
     const g = $('bombGauge');
     g.classList.remove('charged'); void g.offsetWidth; g.classList.add('charged');
-    setTimeout(() => toast('💣 폭탄 충전! 다음 블럭에 붙습니다', 1800), ev.lineCount ? 900 : 0);
+    setTimeout(() => { toast('💣 폭탄 충전! 다음 블럭에 붙습니다', 1800); sfx('charge'); }, ev.lineCount ? 900 : 0);
   }
 
   if (ev.levelUp) {
@@ -599,7 +594,7 @@ function doPlace(slot, r, c) {
       showCombo(`LEVEL ${ev.levelUp}`, (ev.stones.length ? `기본 블럭 +${ev.stones.length} · ` : '') + `점수 ×${mult.toFixed(1)}`, true);
       const c = cellXY(Math.floor(N * N / 2) + N / 2);
       fx.levelUp({ x: c.x - c.u / 2, y: c.y - c.u / 2 }, c.u);
-      boom(2); [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.14, i * 0.09));
+      sfx('levelup');
       buzz(BUZZ.levelUp);
       toast(`레벨 ${ev.levelUp}! 큰 블럭이 늘고 기본 블럭이 떨어집니다`, 2000);
     }, ev.lineCount > 0 ? 900 : 0);
@@ -612,12 +607,12 @@ function doPlace(slot, r, c) {
   checkAchievements(ev);
   announceMissions(M.onPlace(todayMissions(), missionList(), ev, state, mode));
   if (state.over) setTimeout(finish, 500);
-  else if (state.stuck) beep(180, 0.3);
+  else if (state.stuck) sfx('stuck');
 }
 
 function useRefresh() {
   if (!G.refreshTray(state)) return;
-  beep(660, 0.08); beep(990, 0.12, 0.08);
+  sfx('refresh');
   buzz(BUZZ.refresh);
   persist();
   render([0, 1, 2]);
@@ -656,13 +651,14 @@ async function finish() {
   $('btnAgain').textContent = mode === 'daily' ? '일반 모드 하러 가기' : '다시 도전';
   $('overRank').textContent = '';
   $('dlgOver').showModal();
-  if (isRecord) [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.18, i * 0.12));
+  sfx(isRecord ? 'record' : 'gameover');
 
   if (!O.enabled() || !O.profile) {
     $('overRank').textContent = O.enabled() ? '로그인하면 이 점수로 친구들과 순위를 겨룰 수 있습니다' : '';
     return;
   }
   const sent = await O.submitScore(state.score, mode, state.dailyDate);
+  loadChampion();
   if (!sent) { $('overRank').textContent = '점수를 보관했습니다. 연결되면 자동으로 전송됩니다.'; return; }
   try {
     const period = mode === 'daily' ? 'daily' : 'week';
@@ -712,7 +708,10 @@ function setSignupMode(on) {
 
 function refreshUser() {
   $('btnUser').textContent = O.profile ? O.profile.nickname : '로그인';
-  $('btnMute').classList.toggle('muted', data.settings.mute);
+  const snd = data.settings.sound || 'all';
+  A.setMode(snd);
+  $('btnMute').textContent = { all: '🔊', sfx: '🔉', off: '🔇' }[snd];
+  $('btnMute').classList.toggle('muted', snd === 'off');
 }
 
 async function onLoggedIn() {
@@ -727,6 +726,7 @@ async function onLoggedIn() {
   await O.flushPending();
   render();
   loadRivals();
+  loadChampion();
 }
 
 // 로그인·회원가입 공통 처리. 시작 화면과 게임 안 대화창이 같이 쓴다.
@@ -739,6 +739,7 @@ async function doAuth({ id, pw, nick, signup, err, btn }) {
   try {
     if (signup) await O.signUp(id, nick, pw); else await O.signIn(id, pw);
     toast(`${O.profile.nickname} 님, 환영합니다!`);
+    sfx('login');
     await onLoggedIn();
     return true;
   } catch (ex) {
@@ -807,6 +808,7 @@ $('btnUser').addEventListener('click', () => {
 
 $('btnLogout').addEventListener('click', async () => {
   await O.signOut();
+  $('champ').hidden = true;
   $('dlgUser').close();
   refreshUser();
   render();
@@ -816,7 +818,7 @@ $('btnLogout').addEventListener('click', async () => {
 });
 
 // ---------- 랭킹 ----------
-const rankSel = { scope: 'friends', period: 'week' };
+const rankSel = { scope: 'global', period: 'all' };
 
 function listMessage(listEl, msg) {
   const li = document.createElement('li');
@@ -865,6 +867,7 @@ function openRank(period) {
   }
   $('dlgRank').showModal();
   loadRank();
+  loadChampion();
 }
 $('btnRank').addEventListener('click', () => openRank());
 
@@ -1080,7 +1083,13 @@ $('btnHelp').addEventListener('click', () => { $('dlgRecords').close(); openHelp
 $('btnTray').addEventListener('click', useRefresh);
 $('btnGiveUp').addEventListener('click', () => { G.giveUp(state); render(); finish(); });
 $('btnMode').addEventListener('click', () => startGame(mode === 'daily' ? 'classic' : 'daily'));
-$('btnMute').addEventListener('click', () => { data.settings.mute = !data.settings.mute; S.save(); refreshUser(); });
+$('btnMute').addEventListener('click', () => {
+  const order = ['all', 'sfx', 'off'];
+  const next = order[(order.indexOf(data.settings.sound || 'all') + 1) % 3];
+  data.settings.sound = next; data.settings.mute = next === 'off'; S.save(); refreshUser();
+  toast({ all: '🔊 효과음 + 음악', sfx: '🔉 효과음만', off: '🔇 소리 끔' }[next], 1200);
+  if (next !== 'off') sfx('combo', { gain: 0.6 });
+});
 $('btnAgain').addEventListener('click', () => { $('dlgOver').close(); startGame('classic', mode === 'classic'); });
 $('dlgOver').addEventListener('cancel', (e) => e.preventDefault());
 for (const b of document.querySelectorAll('[data-close]')) {
@@ -1090,8 +1099,8 @@ for (const b of document.querySelectorAll('[data-close]')) {
 // ---------- 새 버전 감지 ----------
 // GitHub Pages는 파일을 10분쯤 캐시한다. version.json(캐시 없이 읽음)이 더 새 버전이면
 // 모든 파일을 서버에서 다시 받아 캐시를 갈아 끼운 뒤 새로고침한다.
-const ASSETS = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/shapes.js', 'js/game.js',
-  'js/storage.js', 'js/online.js', 'js/main.js', 'vendor/supabase.js'];
+const ASSETS = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/shapes.js', 'js/game.js', 'js/storage.js', 'js/online.js',
+  'js/main.js', 'js/fx.js', 'js/audio.js', 'js/achievements.js', 'js/missions.js', 'vendor/supabase.js'];
 const newer = (a, b) => { // a가 b보다 새 버전인가 ("1.10.0" > "1.9.0")
   const x = a.split('.').map(Number), y = b.split('.').map(Number);
   for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
@@ -1136,4 +1145,4 @@ O.init().then((p) => {
 }).catch(() => showStart());
 
 // 검수용 창구 (테스트에서 현재 상태를 읽는다)
-globalThis.__blockfill = { get state() { return state; }, get mode() { return mode; } };
+globalThis.__blockfill = { get state() { return state; }, get mode() { return mode; }, audio: A };

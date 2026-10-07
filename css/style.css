@@ -56,7 +56,13 @@ nav { display: flex; gap: 6px; flex-wrap: wrap; }
 
 #rival { width: 100%; min-height: 30px; font-size: 13px; color: var(--muted); text-align: center;
   background: var(--panel); border-radius: 10px; padding: 6px 10px; }
+#rival { display: flex; flex-direction: column; gap: 2px; }
 #rival b { color: var(--accent2); }
+#champ { color: #ffd23f; font-weight: 700; }
+#champ[hidden] { display: none; }
+#champ b { color: #fff; }
+#champ.me { color: var(--accent); }
+@media (max-height: 700px) { #rival { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 2px 10px; font-size: 12px; } }
 #rival.passed { color: var(--accent); animation: bump .4s; }
 
 #boardWrap { position: relative; }

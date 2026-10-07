@@ -438,6 +438,8 @@ test('저장 데이터 이전: 옛 데이터의 값은 유지하고 빠진 필�
   const m2 = migrate(v1);
   assert.equal(m2.schema, SCHEMA);
   assert.equal(m2.settings.helpShown, false);
+  assert.equal(migrate({ schema: 4, settings: { mute: true } }).settings.sound, 'off'); // 옛 음소거를 이어받는다
+  assert.equal(migrate({ schema: 4, settings: { mute: false } }).settings.sound, 'all');
   assert.equal(m2.local.games, 3);
   assert.deepEqual(m2.local.history, []);
 });

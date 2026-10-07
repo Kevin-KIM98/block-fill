@@ -22,7 +22,7 @@
       <button id="btnMode" class="chip" title="모드 전환">일일 도전</button>
       <button id="btnRank" class="chip">랭킹</button>
       <button id="btnFriends" class="chip">친구</button>
-      <button id="btnMute" class="chip icon" aria-label="소리">♪</button>
+      <button id="btnMute" class="chip icon" aria-label="소리" title="소리: 전체 → 효과음만 → 끄기">🔊</button>
       <button id="btnUser" class="chip accent">로그인</button>
     </nav>
   </header>
@@ -33,7 +33,7 @@
     <div class="stat points"><small>포인트</small><b id="points">0</b></div>
   </section>
 
-  <div id="rival"></div>
+  <div id="rival"><span id="champ" hidden></span><span id="rivalText"></span></div>
 
   <div id="boardWrap">
     <div id="board"></div>
@@ -111,10 +111,10 @@
   <div class="sheet">
     <h2>랭킹</h2>
     <div class="tabs" id="rankScope">
-      <button data-v="friends" class="on">친구</button><button data-v="global">전체</button>
+      <button data-v="global" class="on">전체</button><button data-v="friends">친구</button>
     </div>
     <div class="tabs small" id="rankPeriod">
-      <button data-v="week" class="on">이번 주</button><button data-v="all">역대</button><button data-v="daily">오늘의 도전</button>
+      <button data-v="all" class="on">역대</button><button data-v="week">이번 주</button><button data-v="daily">오늘의 도전</button>
     </div>
     <ol id="rankList" class="list"></ol>
     <button class="link" data-close>닫기</button>
@@ -181,6 +181,7 @@
   </div>
 </dialog>
 
+<link rel="preload" href="audio/clear1.wav" as="fetch" crossorigin>
 <script src="vendor/supabase.js"></script>
 <script type="module" src="js/main.js"></script>
 </body>

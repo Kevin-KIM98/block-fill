@@ -289,12 +289,14 @@ console.log('\n[5] 온라인 미연결 안내·설정');
   check('아이디가 짧으면 서버에 보내지 않고 안내한다', /3~16자/.test(await page.evaluate(() => document.getElementById('startError').textContent)));
   await page.click('#startGuest');
   await page.waitForFunction(() => document.getElementById('start').hidden, null, { timeout: 3000 });
-  await page.click('#btnMute');
+  await page.click('#btnMute'); await page.click('#btnMute'); // 전체 → 효과음만 → 끄기
   await page.reload(); await enter(page);
   check('음소거 설정이 새로고침 후 유지된다', await page.evaluate(() => document.getElementById('btnMute').classList.contains('muted')));
   await page.click('#btnRecords'); await page.waitForTimeout(100);
   await page.click('#btnHelp'); await page.waitForTimeout(100);
   check('기록 화면에서 게임 방법을 다시 볼 수 있다', await page.evaluate(() => document.getElementById('dlgHelp').open));
+  const au = await page.evaluate(async () => { const a = globalThis.__blockfill.audio; await a.preload(); return ['place', 'clear1', 'bomb', 'mega', 'perfect', 'levelup'].map((n) => a.isLoaded(n)); });
+  check('효과음 파일을 읽어 재생 준비한다', au.every(Boolean), au.join());
   check('manifest·아이콘 응답', (await page.evaluate(async () => [(await fetch('manifest.webmanifest')).status, (await fetch('icons/icon-192.png')).status])).every((s) => s === 200));
   check('콘솔 에러·경고 0건 (설정)', page.logs.length === 0, page.logs.slice(0, 3).join(' | '));
   await page.context().close();

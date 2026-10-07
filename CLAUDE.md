@@ -13,6 +13,7 @@
 - `js/online.js` — Supabase 로그인·랭킹·친구
 - `js/main.js` — 그리기, 드래그, 대화창
 - `js/fx.js` — 캔버스 파티클 이펙트(폭발·충격파·불꽃·콤보 열기). 규칙과 무관
+- `js/audio.js`, `audio/*.wav` — 효과음(Web Audio). 소리는 `tools/make_sfx.py`로 합성해 만든다(외부 사이트 다운로드 없음). `audio/bgm.mp3`를 넣으면 배경음으로 반복 재생
 - `supabase/schema.sql` — DB 구조와 함수
 - `vendor/supabase.js` — supabase-js 2.117.2 UMD (CDN 미사용)
 - `manifest.webmanifest`, `icons/` — 홈 화면 설치(PWA). 서비스 워커는 쓰지 않는다 (업데이트는 `version.json` 방식)

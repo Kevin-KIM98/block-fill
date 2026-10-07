@@ -1,6 +1,6 @@
 // 게임 설정값. 밸런스 조정은 이 파일에서만 한다.
 // 배포할 때 version.json의 값도 같이 올린다 (앱이 새 버전을 알아채는 기준).
-export const APP_VERSION = '2.6.0';
+export const APP_VERSION = '2.7.0';
 
 export const CFG = {
   size: 8,                 // 보드 한 변의 칸 수
@@ -38,6 +38,9 @@ export const CFG = {
     scoreBonus: 0.1,       // 레벨 1당 줄 클리어 점수 배수 +10%
   },
 };
+
+// 배경음악 파일 주소. Suno 등으로 만든 mp3를 audio/bgm.mp3 로 넣고 'audio/bgm.mp3' 로 바꾸면 반복 재생된다. 비우면 없음.
+export const BGM_URL = '';
 
 // 온라인(로그인·랭킹) 설정. Supabase 프로젝트를 만든 뒤 두 값을 채우면 켜진다.
 // anon key는 공개되어도 되는 키다. service_role 키는 절대 넣지 말 것.
