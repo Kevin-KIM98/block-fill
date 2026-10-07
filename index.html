@@ -12,7 +12,7 @@
 <body>
 <div id="app">
   <header>
-    <h1>BLOCK<span>FILL</span></h1>
+    <h1>BLOCK<span>FILL</span> <small id="version"></small></h1>
     <nav>
       <button id="btnMode" class="chip" title="모드 전환">일일 도전</button>
       <button id="btnRank" class="chip">랭킹</button>
@@ -48,11 +48,12 @@
 
   <div id="tray"></div>
 
-  <footer><span id="streak"></span><span id="version"></span></footer>
+  <footer><span id="streak"></span><span id="versionFoot"></span></footer>
 </div>
 
 <div id="drag"></div>
 <div id="toast"></div>
+<button id="update" hidden>새 버전이 나왔습니다 · 눌러서 업데이트</button>
 
 <dialog id="dlgAuth">
   <form method="dialog" class="sheet" id="authForm">

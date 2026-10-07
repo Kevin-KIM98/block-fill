@@ -634,8 +634,44 @@ for (const b of document.querySelectorAll('[data-close]')) {
   b.addEventListener('click', () => b.closest('dialog').close());
 }
 
+// ---------- 새 버전 감지 ----------
+// GitHub Pages는 파일을 10분쯤 캐시한다. version.json(캐시 없이 읽음)이 더 새 버전이면
+// 모든 파일을 서버에서 다시 받아 캐시를 갈아 끼운 뒤 새로고침한다.
+const ASSETS = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/shapes.js', 'js/game.js',
+  'js/storage.js', 'js/online.js', 'js/main.js', 'vendor/supabase.js'];
+const newer = (a, b) => { // a가 b보다 새 버전인가 ("1.10.0" > "1.9.0")
+  const x = a.split('.').map(Number), y = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+};
+async function applyUpdate(version) {
+  const btn = $('update');
+  btn.disabled = true;
+  btn.textContent = '업데이트 중…';
+  await Promise.allSettled(ASSETS.map((a) => fetch(a, { cache: 'reload' })));
+  try { sessionStorage.setItem('blockfill.updated', version); } catch { /* 무시 */ }
+  location.reload();
+}
+async function checkUpdate() {
+  try {
+    const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const { version } = await res.json();
+    if (!version || !newer(version, APP_VERSION)) return;
+    let tried = null;
+    try { tried = sessionStorage.getItem('blockfill.updated'); } catch { /* 무시 */ }
+    const btn = $('update');
+    btn.hidden = false;
+    btn.onclick = () => applyUpdate(version);
+    if (tried !== version && !drag) applyUpdate(version); // 처음 발견했으면 자동으로, 실패했으면 버튼으로
+  } catch { /* 오프라인 등 */ }
+}
+
 // ---------- 시작 ----------
 $('version').textContent = `v${APP_VERSION}`;
+$('versionFoot').textContent = `v${APP_VERSION}`;
+checkUpdate();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
 refreshUser();
 startGame('classic');
 O.init().then((p) => { if (p) onLoggedIn(); });

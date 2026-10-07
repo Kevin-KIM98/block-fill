@@ -1,9 +1,10 @@
 // 실행: node tests/game.test.mjs
 import assert from 'node:assert/strict';
-import { CFG } from '../js/config.js';
+import { CFG, APP_VERSION } from '../js/config.js';
 import { SHAPES } from '../js/shapes.js';
 import * as G from '../js/game.js';
 import { migrate, SCHEMA } from '../js/storage.js';
+import { readFileSync } from 'node:fs';
 
 let passed = 0;
 function test(name, fn) {
@@ -19,6 +20,11 @@ const empty = (extra = {}) => {
   s.board.fill(0);
   return Object.assign(s, extra);
 };
+
+test('version.json과 config.js의 APP_VERSION이 같다 (배포 시 둘 다 올릴 것)', () => {
+  const v = JSON.parse(readFileSync(new URL('../version.json', import.meta.url), 'utf8')).version;
+  assert.equal(v, APP_VERSION);
+});
 
 test('모양 목록에 중복이 없고 모두 5x5 안에 들어간다', () => {
   const keys = new Set(SHAPES.map((s) => JSON.stringify(s.cells)));

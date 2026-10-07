@@ -26,6 +26,12 @@ input { font: inherit; }
 header { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 h1 { margin: 0; font-size: 20px; letter-spacing: 1px; font-weight: 900; }
 h1 span { color: var(--accent); }
+h1 small { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0; vertical-align: middle;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 2px 7px; }
+#update { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 50;
+  background: var(--accent); color: #1a1300; font-weight: 700; font-size: 14px; padding: 10px 16px; border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.5); animation: bump .5s; }
+#update[hidden] { display: none; }
 nav { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 11px; font-size: 13px; }
 .chip.accent { background: var(--accent); color: #1a1300; border-color: transparent; font-weight: 700; max-width: 110px;

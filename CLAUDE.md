@@ -29,7 +29,7 @@
 - 수치 조정은 `config.js`에서만 한다.
 - 규칙을 바꾸면 `tests/game.test.mjs`에 테스트를 추가하고 통과시킨다.
 - 화면 문구는 한국어. 사용자 입력은 `textContent`로만 넣는다(`innerHTML` 금지).
-- 배포할 때 `APP_VERSION`을 올린다.
+- 배포할 때 `APP_VERSION`과 `version.json`을 같이 올린다 (테스트가 둘이 같은지 확인한다). 앱은 `version.json`이 더 새 버전이면 캐시를 갈아 끼우고 새로고침한다.
 
 ## 아직 확인되지 않은 것
 - Supabase 연동(가입·점수 등록·랭킹·친구)은 실제 프로젝트에 연결해 본 적이 없다. 연결 후 `design/plan.md` 6번의 남은 항목을 점검할 것.
