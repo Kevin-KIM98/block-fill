@@ -1,23 +1,37 @@
 // 블럭 모양 정의. 기본형을 회전시켜 중복 없는 전체 목록을 만든다.
-// color는 모양마다 고유한 색 번호(css의 --cN). 8은 기본 블럭(game.js의 STONE)이라 쓰지 않는다.
 // 순서·weight를 바꾸면 일일 도전 판이 달라지므로 자정(KST) 직후에만 배포한다.
 const BASES = [
-  { name: 'dot', color: 1, weight: 4, rows: ['#'] },
-  { name: 'i2', color: 2, weight: 6, rows: ['##'] },
-  { name: 'i3', color: 3, weight: 7, rows: ['###'] },
-  { name: 'i4', color: 4, weight: 5, rows: ['####'] },
-  { name: 'i5', color: 5, weight: 3, rows: ['#####'] },
-  { name: 'o2', color: 6, weight: 7, rows: ['##', '##'] },
-  { name: 'o3', color: 7, weight: 3, rows: ['###', '###', '###'] },
-  { name: 'r23', color: 9, weight: 4, rows: ['###', '###'] },
-  { name: 'l3', color: 10, weight: 7, rows: ['#.', '##'] },
-  { name: 'l4', color: 11, weight: 5, rows: ['#.', '#.', '##'] },
-  { name: 'j4', color: 12, weight: 5, rows: ['.#', '.#', '##'] },
-  { name: 't4', color: 13, weight: 5, rows: ['###', '.#.'] },
-  { name: 's4', color: 14, weight: 3, rows: ['.##', '##.'] },
-  { name: 'z4', color: 15, weight: 3, rows: ['##.', '.##'] },
-  { name: 'l5', color: 16, weight: 3, rows: ['#..', '#..', '###'] },
+  // 처음 15종. 순서를 바꾸면 저장된 판의 블럭 id가 어긋나므로 그대로 둔다.
+  { name: 'dot', weight: 3, rows: ['#'] },
+  { name: 'i2', weight: 5, rows: ['##'] },
+  { name: 'i3', weight: 6, rows: ['###'] },
+  { name: 'i4', weight: 5, rows: ['####'] },
+  { name: 'i5', weight: 3, rows: ['#####'] },
+  { name: 'o2', weight: 6, rows: ['##', '##'] },
+  { name: 'o3', weight: 3, rows: ['###', '###', '###'] },
+  { name: 'r23', weight: 4, rows: ['###', '###'] },
+  { name: 'l3', weight: 6, rows: ['#.', '##'] },
+  { name: 'l4', weight: 5, rows: ['#.', '#.', '##'] },
+  { name: 'j4', weight: 5, rows: ['.#', '.#', '##'] },
+  { name: 't4', weight: 5, rows: ['###', '.#.'] },
+  { name: 's4', weight: 4, rows: ['.##', '##.'] },
+  { name: 'z4', weight: 4, rows: ['##.', '.##'] },
+  { name: 'l5', weight: 3, rows: ['#..', '#..', '###'] },
+  // 추가 모양 (v1.2). 새 모양은 반드시 목록 끝에만 붙인다.
+  { name: 'diag2', weight: 3, rows: ['#.', '.#'] },
+  { name: 'diag3', weight: 2, rows: ['#..', '.#.', '..#'] },
+  { name: 't5', weight: 3, rows: ['###', '.#.', '.#.'] },
+  { name: 'plus', weight: 2, rows: ['.#.', '###', '.#.'] },
+  { name: 'u5', weight: 3, rows: ['#.#', '###'] },
+  { name: 'n5', weight: 2, rows: ['.##', '.#.', '##.'] },
+  { name: 'w5', weight: 2, rows: ['#..', '##.', '.##'] },
+  { name: 'tall5', weight: 2, rows: ['#.', '#.', '#.', '##'] },
+  { name: 'tallj5', weight: 2, rows: ['.#', '.#', '.#', '##'] },
 ];
+
+// 색 번호: 기본형 순서대로 1부터. 8은 기본 블럭(game.js의 STONE)이라 건너뛴다.
+let colorNo = 1;
+for (const b of BASES) { if (colorNo === 8) colorNo++; b.color = colorNo++; }
 
 function toCells(rows) {
   const cells = [];

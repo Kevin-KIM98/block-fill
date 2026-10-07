@@ -1,5 +1,5 @@
 // 게임 설정값. 밸런스 조정은 이 파일에서만 한다.
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.2.0';
 
 export const CFG = {
   size: 8,                 // 보드 한 변의 칸 수

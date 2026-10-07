@@ -2,11 +2,14 @@
   --bg: #12131c; --panel: #1c1e2b; --panel2: #262939; --line: #32364a;
   --text: #eef0f8; --muted: #8b90a8; --accent: #ffb020; --accent2: #4fd1ff; --danger: #ff5d6c;
   --cell: calc(min(92vw, 440px, 50vh) / 8);
-  /* 블럭 색: 모양마다 하나씩(js/shapes.js의 color). 8번은 기본 블럭 */
-  --c1: hsl(0 88% 63%);   --c2: hsl(24 88% 63%);  --c3: hsl(48 88% 63%);  --c4: hsl(120 88% 63%);
-  --c5: hsl(192 88% 63%); --c6: hsl(240 88% 63%); --c7: hsl(288 88% 63%); --c8: #6f7592;
-  --c9: hsl(336 88% 63%); --c10: hsl(72 88% 63%); --c11: hsl(168 88% 63%); --c12: hsl(216 88% 63%);
-  --c13: hsl(264 88% 63%); --c14: hsl(96 88% 63%); --c15: hsl(144 88% 63%); --c16: hsl(312 88% 63%);
+  /* 블럭 색: 기본형마다 하나씩(js/shapes.js가 순서대로 번호를 매김). 8번은 기본 블럭 */
+  --c1: hsl(0 88% 64%); --c2: hsl(105 88% 52%); --c3: hsl(210 88% 64%); --c4: hsl(315 88% 52%);
+  --c5: hsl(60 88% 64%); --c6: hsl(165 88% 52%); --c7: hsl(270 88% 64%); --c9: hsl(15 88% 52%);
+  --c10: hsl(120 88% 64%); --c11: hsl(225 88% 52%); --c12: hsl(330 88% 64%); --c13: hsl(75 88% 52%);
+  --c14: hsl(180 88% 64%); --c15: hsl(285 88% 52%); --c16: hsl(30 88% 64%); --c17: hsl(135 88% 52%);
+  --c18: hsl(240 88% 64%); --c19: hsl(345 88% 52%); --c20: hsl(90 88% 64%); --c21: hsl(195 88% 52%);
+  --c22: hsl(300 88% 64%); --c23: hsl(45 88% 52%); --c24: hsl(150 88% 64%); --c25: hsl(255 88% 52%);
+  --c8: #6f7592;
   color-scheme: dark; /* 브라우저의 강제 다크 모드가 색을 바꾸지 않게 */
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -63,6 +66,15 @@ nav { display: flex; gap: 6px; flex-wrap: wrap; }
 .cell[data-c="14"]::before, .pc.k14::before { background: var(--c14); }
 .cell[data-c="15"]::before, .pc.k15::before { background: var(--c15); }
 .cell[data-c="16"]::before, .pc.k16::before { background: var(--c16); }
+.cell[data-c="17"]::before, .pc.k17::before { background: var(--c17); }
+.cell[data-c="18"]::before, .pc.k18::before { background: var(--c18); }
+.cell[data-c="19"]::before, .pc.k19::before { background: var(--c19); }
+.cell[data-c="20"]::before, .pc.k20::before { background: var(--c20); }
+.cell[data-c="21"]::before, .pc.k21::before { background: var(--c21); }
+.cell[data-c="22"]::before, .pc.k22::before { background: var(--c22); }
+.cell[data-c="23"]::before, .pc.k23::before { background: var(--c23); }
+.cell[data-c="24"]::before, .pc.k24::before { background: var(--c24); }
+.cell[data-c="25"]::before, .pc.k25::before { background: var(--c25); }
 .cell[data-c="8"]::before { background: repeating-linear-gradient(135deg, var(--c8) 0 4px, #5c617c 4px 8px); }
 .cell.ghost::before { background: rgba(255,255,255,.28); }
 .cell.will::before { filter: brightness(1.5); box-shadow: 0 0 10px var(--accent); }
