@@ -729,6 +729,79 @@ $('btnShare').addEventListener('click', () => {
   copyText(`BLOCK FILL에서 ${fmt(state.score)}점! 내 기록 깰 수 있어?${code}\n${location.href}`, '결과를 복사했습니다');
 });
 
+// ---------- 결과 이미지 ----------
+function resultImage() {
+  const W = 720, H = 1010;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  if (!g.roundRect) g.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); }; // 옛 브라우저
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const grad = g.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, '#12131c'); grad.addColorStop(1, '#1d2033');
+  g.fillStyle = grad; g.fillRect(0, 0, W, H);
+  g.textAlign = 'center';
+  g.fillStyle = '#eef0f8'; g.font = '900 44px system-ui, sans-serif';
+  g.fillText('BLOCK', W / 2 - 58, 80);
+  g.fillStyle = css('--accent'); g.fillText('FILL', W / 2 + 62, 80);
+  g.fillStyle = '#8b90a8'; g.font = '600 24px system-ui, sans-serif';
+  g.fillText(mode === 'daily' ? `오늘의 도전 ${state.dailyDate}` : '일반 모드', W / 2, 122);
+  g.fillStyle = css('--accent'); g.font = '900 120px system-ui, sans-serif';
+  g.fillText(fmt(state.score), W / 2, 250);
+  g.fillStyle = '#eef0f8'; g.font = '700 26px system-ui, sans-serif';
+  const own = $('overOwn').textContent || (!$('overBadge').hidden ? '최고 기록 갱신! 🎉' : '');
+  if (own) g.fillText(own, W / 2, 300);
+  // 보드 스냅샷
+  const u = 64, ox = (W - u * N) / 2, oy = 340;
+  g.fillStyle = '#1c1e2b';
+  g.beginPath(); g.roundRect(ox - 10, oy - 10, u * N + 20, u * N + 20, 16); g.fill();
+  state.board.forEach((v, i) => {
+    const x = ox + (i % N) * u, y = oy + Math.floor(i / N) * u;
+    g.fillStyle = v ? (v === G.STONE ? css('--c8') : css(`--c${v}`)) : '#262939';
+    g.beginPath(); g.roundRect(x + 3, y + 3, u - 6, u - 6, 8); g.fill();
+    if (v) { g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.roundRect(x + 3, y + u - 13, u - 6, 10, 6); g.fill(); }
+  });
+  g.fillStyle = '#8b90a8'; g.font = '600 22px system-ui, sans-serif';
+  g.fillText(`지운 줄 ${state.lines} · 최대 콤보 ${state.bestCombo} · 리프레시 ${state.trayRefreshes + state.boardRefreshes}회`, W / 2, oy + u * N + 50);
+  g.fillStyle = '#eef0f8'; g.font = '800 26px system-ui, sans-serif';
+  g.fillText('내 기록 깰 수 있어?', W / 2, oy + u * N + 95);
+  g.fillStyle = css('--accent2'); g.font = '600 20px system-ui, sans-serif';
+  g.fillText(location.origin + location.pathname, W / 2, oy + u * N + 128);
+  return new Promise((res) => cv.toBlob(res, 'image/png'));
+}
+
+async function shareImage() {
+  const btn = $('btnShareImg');
+  btn.disabled = true;
+  try {
+    const blob = await resultImage();
+    const file = new File([blob], `blockfill-${state.score}.png`, { type: 'image/png' });
+    const text = `BLOCK FILL에서 ${fmt(state.score)}점! 내 기록 깰 수 있어?`;
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'BLOCK FILL', text });
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      toast('이미지를 저장했습니다. 친구에게 보내 보세요!');
+    }
+  } catch (ex) {
+    if (ex?.name !== 'AbortError') toast('이미지를 만들지 못했습니다');
+  } finally {
+    btn.disabled = false;
+  }
+}
+$('btnShareImg').addEventListener('click', shareImage);
+
+// ---------- 게임 방법 ----------
+function openHelp() {
+  data.settings.helpShown = true;
+  S.save();
+  $('dlgHelp').showModal();
+}
+$('btnHelp').addEventListener('click', () => { $('dlgRecords').close(); openHelp(); });
+
 // ---------- 버튼 ----------
 $('btnTray').addEventListener('click', () => useRefresh('tray'));
 $('btnBoard').addEventListener('click', () => useRefresh('board'));
@@ -782,6 +855,8 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 refreshUser();
 startGame('classic');
 O.init().then((p) => { if (p) onLoggedIn(); });
+// 처음 온 사람(끝낸 판 없음)에게 한 번만 게임 방법을 보여 준다
+if (!data.settings.helpShown && data.local.games === 0 && state.moves === 0) setTimeout(openHelp, 400);
 
 // 검수용 창구 (테스트에서 현재 상태를 읽는다)
 globalThis.__blockfill = { get state() { return state; }, get mode() { return mode; } };

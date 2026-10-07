@@ -251,7 +251,8 @@ test('저장 데이터 이전: 옛 데이터의 값은 유지하고 빠진 필�
   // schema 1 → 2: 기존 값은 그대로, 기록·업적 필드만 생긴다
   const v1 = { schema: 1, local: { best: 9, games: 3, streak: 2, lastPlay: '2026-10-01' } };
   const m2 = migrate(v1);
-  assert.equal(m2.schema, 2);
+  assert.equal(m2.schema, SCHEMA);
+  assert.equal(m2.settings.helpShown, false);
   assert.equal(m2.local.games, 3);
   assert.deepEqual(m2.local.history, []);
 });

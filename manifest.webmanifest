@@ -1,0 +1,17 @@
+{
+  "name": "BLOCK FILL — 블록 퍼즐 랭킹전",
+  "short_name": "BLOCK FILL",
+  "description": "블럭을 끼워 줄을 지우고 친구와 점수를 겨루는 퍼즐",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#12131c",
+  "theme_color": "#12131c",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

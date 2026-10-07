@@ -13,6 +13,7 @@
 - `js/main.js` — 그리기, 드래그, 대화창
 - `supabase/schema.sql` — DB 구조와 함수
 - `vendor/supabase.js` — supabase-js 2.117.2 UMD (CDN 미사용)
+- `manifest.webmanifest`, `icons/` — 홈 화면 설치(PWA). 서비스 워커는 쓰지 않는다 (업데이트는 `version.json` 방식)
 
 ## 명령
 - 테스트: `node tests/game.test.mjs`

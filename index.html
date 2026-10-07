@@ -7,6 +7,11 @@
 <meta name="color-scheme" content="dark">
 <title>BLOCK FILL — 블록 퍼즐 랭킹전</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2312131c'/%3E%3Crect x='2' y='2' width='5' height='5' rx='1' fill='%23ffb020'/%3E%3Crect x='9' y='2' width='5' height='5' rx='1' fill='%234fd1ff'/%3E%3Crect x='2' y='9' width='5' height='5' rx='1' fill='%23ff5d6c'/%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -115,7 +120,21 @@
     </div>
     <p class="hint" id="recSummary"></p>
     <ol id="recList" class="list"></ol>
+    <button class="link" id="btnHelp">게임 방법 보기</button>
     <button class="link" data-close>닫기</button>
+  </div>
+</dialog>
+
+<dialog id="dlgHelp">
+  <div class="sheet">
+    <h2>게임 방법</h2>
+    <ol class="howto">
+      <li><b>끌어다 놓기</b><span>아래 블럭 3개 중 하나를 눌러 보드로 끌어다 놓으세요. 놓으면 그 자리에 새 블럭이 생깁니다.</span></li>
+      <li><b>줄 지우기</b><span>가로나 세로 한 줄이 꽉 차면 지워지고 칸 수만큼 포인트를 얻습니다. 여러 줄을 한 번에, 연속으로 지우면 배수가 붙습니다.</span></li>
+      <li><b>막히면 리프레시</b><span>놓을 곳이 없으면 포인트로 <b>블럭 교체</b>나 <b>보드 리셋</b>을 사세요. 쓸수록 비싸집니다.</span></li>
+      <li><b>기록과 경쟁</b><span>"최고 기록" 카드를 누르면 내 기록과 업적이 보입니다. 일일 도전은 모두 같은 판으로 하루 한 번 겨룹니다.</span></li>
+    </ol>
+    <button class="primary" data-close>시작하기</button>
   </div>
 </dialog>
 
@@ -130,7 +149,8 @@
     <button class="primary" id="btnAgain">다시 도전</button>
     <button class="link" id="btnOverRecords">내 기록·업적 보기</button>
     <button class="link" id="btnOverRank">랭킹 보기</button>
-    <button class="link" id="btnShare">결과 복사해서 자랑하기</button>
+    <button class="primary alt" id="btnShareImg">📸 결과 이미지 공유</button>
+    <button class="link" id="btnShare">글로 복사해서 자랑하기</button>
   </div>
 </dialog>
 

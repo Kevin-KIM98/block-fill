@@ -1,11 +1,11 @@
 // 기기 저장소. 버전 번호를 두고 구조가 바뀌면 단계별로 이전한다.
 // 규칙: 저장 키를 바꾸거나 통째로 지우지 않는다. 새 필드는 migrate()에서 채운다.
 const KEY = 'blockfill.save';
-export const SCHEMA = 2;
+export const SCHEMA = 3;
 
 const defaults = () => ({
   schema: SCHEMA,
-  settings: { mute: false },
+  settings: { mute: false, helpShown: false }, // helpShown: 게임 방법을 한 번 보여 줬는가
   local: { best: 0, games: 0, streak: 0, lastPlay: null,
     history: [],        // 최근 판 기록 [{ score, date, mode, lines, combo, moves, refresh }] 최신순
     achievements: {} }, // { 업적id: 달성 날짜 }
@@ -29,6 +29,10 @@ export function migrate(data) {
     data.local.history ??= [];
     data.local.achievements ??= {};
     data.schema = 2;
+  }
+  if (data.schema < 3) { // v1.6: 첫 실행 안내
+    data.settings.helpShown ??= false;
+    data.schema = 3;
   }
   data.schema = SCHEMA;
   return data;
