@@ -270,13 +270,66 @@ function flash(list, cls, ms) {
   setTimeout(() => { for (const i of list) cells[i].classList.remove(cls); }, ms);
 }
 
-function showCombo(text) {
+function showCombo(gain, note, big) {
   const el = $('comboText');
-  el.textContent = text;
+  $('comboGain').textContent = gain;
+  $('comboNote').textContent = note;
+  el.classList.toggle('big', big);
   el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
 }
 
+// ---------- 줄 제거 이펙트 (파편·빛줄기) ----------
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const colorOf = (n) => getComputedStyle(document.documentElement).getPropertyValue(`--c${n}`).trim() || '#fff';
+
+function burst(cleared, colors, rows, cols) {
+  if (reduceMotion) return;
+  const fx = $('fx');
+  const u = cells[0].getBoundingClientRect().width;
+  const frag = document.createDocumentFragment();
+  // 지워진 줄을 따라 지나가는 빛줄기
+  for (const row of rows) {
+    const b = document.createElement('div');
+    b.className = 'beam';
+    Object.assign(b.style, { left: '0', width: `${u * N}px`, top: `${row * u + u * .2}px`, height: `${u * .6}px` });
+    frag.appendChild(b);
+  }
+  for (const col of cols) {
+    const b = document.createElement('div');
+    b.className = 'beam v';
+    Object.assign(b.style, { top: '0', height: `${u * N}px`, left: `${col * u + u * .2}px`, width: `${u * .6}px` });
+    frag.appendChild(b);
+  }
+  // 칸마다 색 파편이 사방으로 튄다
+  const per = cleared.length > 24 ? 3 : 5;
+  const sparks = [];
+  for (const i of cleared) {
+    const r = Math.floor(i / N), c = i % N;
+    const cx = c * u + u / 2, cy = r * u + u / 2;
+    for (let k = 0; k < per; k++) {
+      const d = document.createElement('div');
+      d.className = 'spark';
+      d.style.setProperty('--pc', colors[i]);
+      d.style.left = `${cx - 4}px`; d.style.top = `${cy - 4}px`;
+      const ang = Math.random() * Math.PI * 2;
+      const dist = u * (1 + Math.random() * 2.2);
+      sparks.push([d, Math.cos(ang) * dist, Math.sin(ang) * dist + u * .8, 360 * (Math.random() - .5), 450 + Math.random() * 400]);
+      frag.appendChild(d);
+    }
+  }
+  fx.appendChild(frag);
+  for (const [d, dx, dy, rot, ms] of sparks) {
+    d.animate([
+      { transform: 'translate(0,0) scale(1.3)', opacity: 1 },
+      { transform: `translate(${dx * .6}px, ${dy * .4}px) scale(1)`, opacity: 1, offset: .35 },
+      { transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(.2)`, opacity: 0 },
+    ], { duration: ms, easing: 'cubic-bezier(.2,.8,.4,1)', fill: 'forwards' }).onfinish = () => d.remove();
+  }
+  setTimeout(() => { for (const b of fx.querySelectorAll('.beam')) b.remove(); }, 500);
+}
+
 function doPlace(slot, r, c) {
+  const before = state.board.slice(); // 지워지기 전 색을 이펙트에 쓴다
   const ev = G.place(state, slot, r, c);
   if (!ev) return;
   persist();
@@ -284,17 +337,26 @@ function doPlace(slot, r, c) {
   flash(ev.placed.filter((i) => !ev.cleared.includes(i)), 'drop', 200);
 
   if (ev.lineCount > 0) {
-    flash(ev.cleared, 'pop', 450);
-    const parts = [`+${fmt(ev.gain)}`];
-    if (ev.lineCount > 1) parts.push(`${ev.lineCount}줄 동시!`);
-    if (ev.combo > 1) parts.push(`${ev.combo} 콤보`);
-    showCombo(parts.join(' · '));
-    for (let i = 0; i < Math.min(ev.lineCount + ev.combo, 6); i++) beep(520 + i * 130, 0.12, i * 0.07);
-    if (ev.lineCount > 1 || ev.combo > 2) {
-      const w = $('boardWrap');
-      w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake');
-      navigator.vibrate?.(40);
+    const shapeColor = SHAPES[ev.shapeId].color;
+    const colors = {};
+    for (const i of ev.cleared) {
+      colors[i] = colorOf(before[i] || shapeColor);
+      cells[i].style.setProperty('--pc', colors[i]);
     }
+    flash(ev.cleared, 'pop', 500);
+    burst(ev.cleared, colors, ev.rows, ev.cols);
+    const b = $('board');
+    b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash');
+
+    const notes = [];
+    if (ev.lineCount > 1) notes.push(['더블!', '트리플!', '쿼드러플!'][Math.min(ev.lineCount, 4) - 2] + ` ${ev.lineCount}줄`);
+    if (ev.combo > 1) notes.push(`${ev.combo} 콤보`);
+    const big = ev.lineCount > 1 || ev.combo > 2;
+    showCombo(`+${fmt(ev.gain)}`, notes.join(' · '), big);
+    for (let i = 0; i < Math.min(ev.lineCount + ev.combo, 6); i++) beep(520 + i * 130, 0.12, i * 0.07);
+    const w = $('boardWrap');
+    w.classList.remove('shake', 'big'); void w.offsetWidth; w.classList.add('shake');
+    if (big) { w.classList.add('big'); navigator.vibrate?.([30, 30, 60]); }
   } else {
     beep(260, 0.05);
   }

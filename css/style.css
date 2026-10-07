@@ -1,7 +1,8 @@
 :root {
   --bg: #12131c; --panel: #1c1e2b; --panel2: #262939; --line: #32364a;
   --text: #eef0f8; --muted: #8b90a8; --accent: #ffb020; --accent2: #4fd1ff; --danger: #ff5d6c;
-  --cell: calc(min(92vw, 440px, 50vh) / 8);
+  /* 보드 한 칸. 세로가 짧은 화면에서는 높이에 맞춰 줄여 트레이·버튼까지 한 화면에 들어가게 한다 */
+  --cell: calc(min(92vw, 440px, 44vh) / 8);
   /* 블럭 색: 기본형마다 하나씩(js/shapes.js가 순서대로 번호를 매김). 8번은 기본 블럭 */
   --c1: hsl(0 88% 64%); --c2: hsl(105 88% 52%); --c3: hsl(210 88% 64%); --c4: hsl(315 88% 52%);
   --c5: hsl(60 88% 64%); --c6: hsl(165 88% 52%); --c7: hsl(270 88% 64%); --c9: hsl(15 88% 52%);
@@ -78,17 +79,36 @@ nav { display: flex; gap: 6px; flex-wrap: wrap; }
 .cell[data-c="8"]::before { background: repeating-linear-gradient(135deg, var(--c8) 0 4px, #5c617c 4px 8px); }
 .cell.ghost::before { background: rgba(255,255,255,.28); }
 .cell.will::before { filter: brightness(1.5); box-shadow: 0 0 10px var(--accent); }
-.cell.pop::after { content: ""; position: absolute; inset: 2px; border-radius: 5px; background: #fff; animation: pop .45s forwards; }
-@keyframes pop { to { transform: scale(.2); opacity: 0; } }
+.cell.pop::after { content: ""; position: absolute; inset: 2px; border-radius: 5px; background: var(--pc, #fff);
+  box-shadow: 0 0 12px var(--pc, #fff); animation: pop .5s forwards; }
+@keyframes pop { 30% { transform: scale(1.2); filter: brightness(2); opacity: 1; } to { transform: scale(0) rotate(90deg); opacity: 0; } }
+#board.flash { animation: flash .4s; }
+@keyframes flash { 30% { box-shadow: 0 0 0 3px var(--accent), 0 0 30px var(--accent); } }
 .cell.drop::before { animation: drop .18s; }
 @keyframes drop { from { transform: scale(1.25); } }
 #boardWrap.shake { animation: shake .3s; }
 @keyframes shake { 25% { transform: translate(3px, -2px); } 50% { transform: translate(-3px, 2px); } 75% { transform: translate(2px, 2px); } }
+#boardWrap.shake.big { animation: shakeBig .45s; }
+@keyframes shakeBig { 20% { transform: translate(6px, -4px) rotate(.6deg); } 40% { transform: translate(-6px, 4px) rotate(-.6deg); } 60% { transform: translate(4px, 3px); } 80% { transform: translate(-3px, -3px); } }
 
-#comboText { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
-  font-size: 30px; font-weight: 900; color: var(--accent); text-shadow: 0 3px 0 rgba(0,0,0,.5); opacity: 0; text-align: center; }
-#comboText.show { animation: rise .9s forwards; }
-@keyframes rise { 0% { opacity: 0; transform: scale(.6); } 20% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0; transform: translateY(-40px); } }
+/* 줄 제거 이펙트: 파편과 빛줄기는 #fx 안에 잠깐 생겼다 사라진다 */
+#fx { position: absolute; inset: 4px; pointer-events: none; overflow: visible; z-index: 5; }
+.spark { position: absolute; width: 8px; height: 8px; border-radius: 2px; background: var(--pc, #fff); box-shadow: 0 0 6px var(--pc, #fff); will-change: transform, opacity; }
+.beam { position: absolute; border-radius: 6px; background: linear-gradient(90deg, transparent, #fff 30%, #fff 70%, transparent);
+  box-shadow: 0 0 18px #fff, 0 0 40px var(--accent); animation: beam .45s ease-out forwards; mix-blend-mode: screen; }
+.beam.v { background: linear-gradient(180deg, transparent, #fff 30%, #fff 70%, transparent); }
+@keyframes beam { 0% { opacity: 0; transform: scale(.6, 1); } 25% { opacity: 1; transform: scale(1.05, 1); } 100% { opacity: 0; transform: scale(1.15, 1); } }
+
+#comboText { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  pointer-events: none; z-index: 6; opacity: 0; text-align: center; }
+#comboText b { font-size: 44px; font-weight: 900; color: #fff; line-height: 1;
+  text-shadow: 0 0 12px var(--accent), 0 0 28px var(--accent), 0 3px 0 rgba(0,0,0,.6); }
+#comboText span { font-size: 20px; font-weight: 900; color: var(--accent); text-shadow: 0 2px 0 rgba(0,0,0,.6); }
+#comboText span:empty { display: none; }
+#comboText.show { animation: rise 1s forwards; }
+#comboText.big b { font-size: 56px; }
+@keyframes rise { 0% { opacity: 0; transform: scale(.4); } 15% { opacity: 1; transform: scale(1.15); } 30% { transform: scale(1); } 100% { opacity: 0; transform: translateY(-50px); } }
+@media (prefers-reduced-motion: reduce) { .spark, .beam, #boardWrap.shake { animation: none; display: none; } }
 
 #stuck { width: 100%; display: flex; align-items: center; gap: 8px; background: #3a1f28; border: 1px solid var(--danger);
   border-radius: 10px; padding: 8px 10px; font-size: 13px; }

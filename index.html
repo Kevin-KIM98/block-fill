@@ -32,20 +32,21 @@
 
   <div id="boardWrap">
     <div id="board"></div>
-    <div id="comboText"></div>
+    <div id="fx"></div>
+    <div id="comboText"><b id="comboGain"></b><span id="comboNote"></span></div>
   </div>
 
   <div id="stuck" hidden>
-    <span>놓을 곳이 없습니다. 포인트로 리프레시해서 이어 가세요!</span>
+    <span>놓을 곳이 없습니다. 아래 버튼으로 블럭을 바꾸거나 보드를 리셋하세요!</span>
     <button id="btnGiveUp">포기</button>
   </div>
-
-  <div id="tray"></div>
 
   <section class="actions">
     <button id="btnTray"><span>블럭 교체</span><b id="trayCost">50P</b></button>
     <button id="btnBoard"><span>보드 리셋</span><b id="boardCost">200P</b></button>
   </section>
+
+  <div id="tray"></div>
 
   <footer><span id="streak"></span><span id="version"></span></footer>
 </div>
