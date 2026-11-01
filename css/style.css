@@ -47,6 +47,7 @@ nav { display: flex; gap: 6px; flex-wrap: wrap; }
 .stat small { display: block; color: var(--muted); font-size: 11px; }
 .stat b { font-size: 22px; font-variant-numeric: tabular-nums; }
 .stat.points b { color: var(--accent); }
+.stat small.sub { font-size: 10px; min-height: 1.2em; line-height: 1.2em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stat.tap { font: inherit; color: inherit; cursor: pointer; }
 .stat.tap:active { background: var(--panel2); }
 .stat b.bump { animation: bump .3s; }

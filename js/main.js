@@ -48,6 +48,16 @@ function toast(msg, ms = 1800) {
 
 const fmt = (n) => Number(n).toLocaleString('ko-KR');
 const best = () => Math.max(data.local.best, O.profile?.best_score || 0);
+// 랭킹(전체·역대) 1위 점수. 로그인 상태에서 loadChampion이 채운다. 0이면 내 기록만 보여 준다.
+let topScore = 0;
+// '최고 기록' 칸: 랭킹 1위 점수(로그인 시)와 내 기록·지금 판 점수 중 큰 값. 아래 줄에 내 기록을 따로 적는다.
+function renderBest() {
+  if (!state) return;
+  const mine = Math.max(best(), mode === 'classic' ? state.score : 0);
+  const top = O.profile ? topScore : 0;
+  setText('best', fmt(Math.max(top, mine)));
+  setText('bestMine', top > mine ? `내 기록 ${fmt(mine)}` : top > 0 ? '내가 1위!' : '');
+}
 
 function setText(id, value, bump = false) {
   const el = $(id);
@@ -115,7 +125,7 @@ function render(freshSlots = []) {
   });
 
   setText('score', fmt(state.score), true);
-  setText('best', fmt(Math.max(best(), mode === 'classic' ? state.score : 0)));
+  renderBest();
   setText('points', fmt(state.points), true);
   setText('modeLabel', mode === 'daily' ? '오늘의 도전' : '점수');
   const lv = state.level ?? G.levelOf(state);
@@ -181,9 +191,11 @@ setInterval(() => { if (!document.hidden && O.profile) { loadChampion(); loadRiv
 // 전체 1위를 보드 위에 보여 준다 (로그인 상태일 때)
 async function loadChampion() {
   const el = $('champ');
-  if (!O.enabled() || !O.profile) { el.hidden = false; el.classList.remove('me'); el.textContent = O.enabled() ? '👑 로그인하면 전체 1위가 표시됩니다' : ''; return; }
+  if (!O.enabled() || !O.profile) { topScore = 0; renderBest(); el.hidden = false; el.classList.remove('me'); el.textContent = O.enabled() ? '👑 로그인하면 전체 1위가 표시됩니다' : ''; return; }
   try {
     const rows = await O.leaderboard('global', 'all', 1);
+    topScore = rows[0]?.score || 0;
+    renderBest();
     el.hidden = false;
     el.replaceChildren();
     if (!rows.length) { el.textContent = '👑 아직 전체 1위가 없습니다 · 첫 주인공이 되세요!'; el.classList.remove('me'); return; }
