@@ -387,8 +387,8 @@ test('놓을 곳이 없어도 포인트가 있으면 리프레시로 이어 간�
     assert.ok(G.refreshTray(s));
     assert.equal(s.points, 10);
   }
-  G.giveUp(s);
-  assert.equal(s.over, true);
+  // 포기 기능은 없다: 막히면 교체로 이어 가고, 포인트가 모자라면 저절로 끝난다 (아래 무작위 1000판 테스트)
+  assert.equal(G.giveUp, undefined);
 });
 
 test('무작위 1000판: 규칙이 깨지지 않는다', () => {

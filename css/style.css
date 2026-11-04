@@ -154,7 +154,6 @@ nav { display: flex; gap: 6px; flex-wrap: wrap; }
   border-radius: 10px; padding: 8px 10px; font-size: 13px; }
 #stuck[hidden] { display: none; }
 #stuck span { flex: 1; }
-#stuck button { background: var(--danger); border-radius: 8px; padding: 6px 12px; font-weight: 700; }
 
 #tray { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: calc(var(--cell) * 8 + 8px); }
 .slot { height: calc(var(--cell) * 2.7); background: var(--panel); border-radius: 12px; display: grid; place-items: center; touch-action: none; }

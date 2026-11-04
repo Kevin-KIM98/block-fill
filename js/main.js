@@ -1196,7 +1196,6 @@ $('btnHelp').addEventListener('click', () => { $('dlgRecords').close(); openHelp
 
 // ---------- 버튼 ----------
 $('btnTray').addEventListener('click', useRefresh);
-$('btnGiveUp').addEventListener('click', () => { G.giveUp(state); render(); finish(); });
 $('btnMode').addEventListener('click', () => startGame(mode === 'daily' ? 'classic' : 'daily'));
 $('btnMute').addEventListener('click', () => {
   const order = ['all', 'sfx', 'off'];

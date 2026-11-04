@@ -131,8 +131,6 @@ console.log('\n[1] 한 판 끝까지 플레이 (마우스 드래그)');
         continue;
       }
       check('포인트 부족: 블럭 교체 버튼이 비활성', u0.trayDisabled);
-      await page.click('#btnGiveUp');
-      await page.waitForTimeout(700);
       break;
     }
     await dragMouse(page, t);
@@ -241,18 +239,23 @@ console.log('\n[4] 일일 도전');
     if (k === 0) {
       check('일일 도전: 출석 보너스 없이 기본 50P로 시작', u.points === 50 && u.st.mode === 'daily', `${u.points}P`);
       // 끝까지 플레이한 뒤 다시 들어가면 막힌다
-      for (let i = 0; i < 400; i++) {
+      // 포기 버튼이 없으므로 막히면 교체를 써 가며 포인트가 바닥날 때까지 플레이한다
+      check('포기 버튼이 없다', await page.evaluate(() => !document.getElementById('btnGiveUp')));
+      for (let i = 0; i < 800; i++) {
+        const s = await ui(page);
+        if (s.over || s.st.over) break;
         const t = await pickTarget(page, false);
-        if (!t) break;
-        await dragMouse(page, t);
+        if (t) await dragMouse(page, t);
+        else if (!s.trayDisabled) await page.click('#btnTray');
+        else break;
       }
-      const s = await ui(page);
-      if (!s.over && !s.st.over) { await page.click('#btnGiveUp'); }
       await page.waitForSelector('#dlgOver[open]', { timeout: 3000 }).catch(() => {});
       check('일일 도전 종료 화면', (await ui(page)).over);
       await page.click('#btnAgain'); await page.waitForTimeout(200);
       const back = await ui(page);
       check('일일 도전 종료 후 "다시"는 일반 모드로 간다', back.st.mode === 'classic');
+      // 끝까지 하면 업적 알림이 늦게(0.7초~) 떠서 안내를 덮을 수 있으므로 알림이 지나간 뒤 확인한다
+      await page.waitForTimeout(3500);
       await page.click('#btnMode'); await page.waitForTimeout(200);
       const again = await ui(page);
       const toast = await page.evaluate(() => document.getElementById('toast').textContent);
