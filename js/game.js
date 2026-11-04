@@ -301,8 +301,3 @@ export function refreshTray(state) {
   updateStatus(state);
   return true;
 }
-
-export function giveUp(state) {
-  state.stuck = false;
-  state.over = true;
-}
